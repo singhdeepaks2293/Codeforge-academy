@@ -29,8 +29,9 @@ services:
       # reads .env automatically. The default below is for local use only.
       SESSION_SECRET: ${SESSION_SECRET:-dev-only-change-me-before-sharing-this-host}
       RUN_TIMEOUT_MS: ${RUN_TIMEOUT_MS:-10000}
-      # Runtimes the image ships: python3, gcc, g++, go.
-      # Rust is not in the image; the API reports it unavailable (see docs/DOCKER.md).
+      # Runtimes baked into the image: python3, gcc, g++, go, rustc/cargo,
+      # php, ruby, lua, elixir, R, ghc, scala, solc, kotlinc (see docs/DOCKER.md).
+      # C#, Dart and Julia are NOT in the image (auto-installable on local hosts only).
       RUNTIME_EXTRA_PATHS: /usr/local/go/bin
     ports:
       - "4000:4000"

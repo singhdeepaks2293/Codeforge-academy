@@ -1,44 +1,61 @@
 import { useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCan } from '../context/AuthContext';
 import { useToast } from './Toast';
-import { api } from '../lib/api';
+import { applyTheme, useTheme } from '../lib/theme';
 
-const studentNav = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/courses', label: 'Explore Courses' },
-  { to: '/my-learning', label: 'My Learning' },
-  { to: '/paths', label: 'Learning Paths' },
-  { to: '/practice', label: 'Practice · DSA' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/achievements', label: 'Achievements' },
-  { to: '/progress', label: 'Progress' },
-  { to: '/profile', label: 'Profile' },
-  { to: '/settings', label: 'Settings' },
+const SIDEBAR_KEY = 'cf-sidebar-collapsed';
+const SIDEBAR_EXPANDED = 210;
+const SIDEBAR_COLLAPSED = 68;
+
+interface NavItem { to: string; label: string; icon: string; }
+
+const studentNav: NavItem[] = [
+  { to: '/', label: 'Dashboard', icon: '⌂' },
+  { to: '/courses', label: 'Explore Courses', icon: '▦' },
+  { to: '/my-learning', label: 'My Learning', icon: '✓' },
+  { to: '/paths', label: 'Learning Paths', icon: '⤳' },
+  { to: '/practice', label: 'Practice · DSA', icon: '⌘' },
+  { to: '/projects', label: 'Projects', icon: '▣' },
+  { to: '/achievements', label: 'Achievements', icon: '★' },
+  { to: '/progress', label: 'Progress', icon: '▤' },
+  { to: '/profile', label: 'Profile', icon: '◉' },
+  { to: '/settings', label: 'Settings', icon: '⚙' },
 ];
-const adminNav = [
-  { to: '/admin', label: 'Admin Dashboard' },
-  { to: '/admin/users', label: 'Users' },
-  { to: '/admin/roles', label: 'Roles & Permissions' },
-  { to: '/admin/curriculum', label: 'Course Management' },
-  { to: '/admin/submissions', label: 'Submissions' },
-  { to: '/admin/audit', label: 'Audit Logs' },
-  { to: '/admin/settings', label: 'System Settings' },
+const adminNav: NavItem[] = [
+  { to: '/admin', label: 'Admin Dashboard', icon: '▤' },
+  { to: '/admin/users', label: 'Users', icon: '◉' },
+  { to: '/admin/roles', label: 'Roles & Permissions', icon: '⚑' },
+  { to: '/admin/curriculum', label: 'Course Management', icon: '▦' },
+  { to: '/admin/submissions', label: 'Submissions', icon: '✉' },
+  { to: '/admin/audit', label: 'Audit Logs', icon: '≡' },
+  { to: '/admin/settings', label: 'System Settings', icon: '⚙' },
 ];
+
+function readCollapsed(): boolean {
+  try { return localStorage.getItem(SIDEBAR_KEY) === '1'; } catch { return false; }
+}
 
 export function Layout() {
   const { user, logout } = useAuth();
   const canAdmin = useCan('users.read');
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const theme = useTheme();
+  const dark = theme === 'dark';
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [q, setQ] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('cf-theme', next ? 'dark' : 'light');
+  // The lesson workspace is a full-height 3-panel layout: it takes the whole
+  // content area (no max-width, no padding, no footer).
+  const isWorkspace = /\/courses\/[^/]+\/lessons\//.test(location.pathname);
+
+  const toggleTheme = () => applyTheme(dark ? 'light' : 'dark');
+  const toggleSidebar = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const doSearch = async (e: React.FormEvent) => {
@@ -47,56 +64,93 @@ export function Layout() {
     navigate(`/courses?q=${encodeURIComponent(q.trim())}`);
   };
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+      collapsed ? 'justify-center px-0' : ''
+    } ${
+      isActive
+        ? 'bg-accent-soft font-semibold text-accent-600'
+        : 'text-muted hover:bg-elevated hover:text-ink'
+    }`;
+
+  const renderNav = (items: NavItem[]) => items.map((n) => (
+    <NavLink key={n.to} to={n.to} end={n.to === '/'} title={collapsed ? n.label : undefined} className={navLinkClass}>
+      <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-base leading-none">{n.icon}</span>
+      {!collapsed && <span className="truncate">{n.label}</span>}
+    </NavLink>
+  ));
+
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-navy-900 md:flex">
-        <Link to="/" className="flex items-center gap-2 px-5 py-4 text-xl font-bold">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-lg text-white">⌘</span>
-          CodeForge <span className="text-brand-600">Academy</span>
+    <div className="flex min-h-screen bg-base">
+      <aside
+        aria-label="Main navigation"
+        className="hidden shrink-0 flex-col overflow-hidden border-r border-line bg-sidebar transition-[width] duration-200 md:flex"
+        style={{ width: collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED }}
+      >
+        <Link to="/" className={`flex items-center gap-2 py-4 text-lg font-bold ${collapsed ? 'justify-center px-0' : 'px-4'}`} title={collapsed ? 'CodeForge Academy' : undefined}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-lg text-white">⌘</span>
+          {!collapsed && <span className="truncate">CodeForge <span className="text-brand-500">Academy</span></span>}
         </Link>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-          {studentNav.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === '/'}
-              className={({ isActive }) => `block rounded-lg px-3 py-2 text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-700 dark:bg-navy-800 dark:text-brand-500' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-800'}`}>
-              {n.label}
-            </NavLink>
-          ))}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden px-3 py-2">
+          {renderNav(studentNav)}
           {canAdmin && (
             <>
-              <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Administration</div>
-              {adminNav.map((n) => (
-                <NavLink key={n.to} to={n.to}
-                  className={({ isActive }) => `block rounded-lg px-3 py-2 text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-700 dark:bg-navy-800 dark:text-brand-500' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-800'}`}>
-                  {n.label}
-                </NavLink>
-              ))}
+              {!collapsed && <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-faint">Administration</div>}
+              {collapsed && <div className="mx-1 my-3 border-t border-line" aria-hidden />}
+              {renderNav(adminNav)}
             </>
           )}
         </nav>
-        <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-          <div className="px-2 text-sm font-semibold">{user?.displayName}</div>
-          <div className="px-2 text-xs text-slate-500">{user?.email} · {user?.role}</div>
-          <button className="btn-ghost mt-2 w-full justify-start" onClick={async () => { await logout(); toast('Signed out', 'success'); navigate('/login'); }}>Sign out</button>
+        <div className="border-t border-line p-3">
+          <button
+            className="btn-ghost w-full justify-start px-2 py-1.5 text-xs"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span aria-hidden className="text-base leading-none">{collapsed ? '»' : '«'}</span>
+            {!collapsed && <span>Collapse</span>}
+          </button>
+          {!collapsed && (
+            <>
+              <div className="mt-2 px-2 text-sm font-semibold">{user?.displayName}</div>
+              <div className="truncate px-2 text-xs text-muted">{user?.email} · {user?.role}</div>
+            </>
+          )}
+          {collapsed && (
+            <div className="mt-2 flex justify-center" title={`${user?.displayName ?? ''} · ${user?.email ?? ''}`}>
+              <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-elevated text-sm font-bold text-accent-600">
+                {(user?.displayName ?? '?').charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <button className="btn-ghost mt-2 w-full justify-start" onClick={async () => { await logout(); toast('Signed out', 'success'); navigate('/login'); }}>
+            <span aria-hidden className="text-base leading-none">↩</span>
+            {!collapsed && <span>Sign out</span>}
+          </button>
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-navy-900/90">
-          <Link to="/" className="text-lg font-bold md:hidden">CodeForge Academy</Link>
+        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-line bg-base/90 px-4 py-3 backdrop-blur">
+          <Link to="/" className="text-lg font-bold md:hidden">CodeForge <span className="text-brand-500">Academy</span></Link>
           <form onSubmit={doSearch} className="hidden flex-1 sm:block">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses, lessons, DSA problems, projects…"
               className="input max-w-md" aria-label="Search" />
           </form>
           <div className="ml-auto flex items-center gap-2">
-            <button className="btn-secondary" onClick={toggleTheme} aria-label="Toggle theme">{dark ? '☀️ Light' : '🌙 Dark'}</button>
+            <button className="btn-secondary" onClick={toggleTheme} aria-label="Toggle theme">{dark ? '☀ Light' : '☾ Dark'}</button>
             <Link to="/profile" className="btn-secondary">Profile</Link>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+        <main className={isWorkspace ? 'flex w-full min-w-0 flex-1 flex-col' : 'mx-auto w-full max-w-6xl flex-1 px-4 py-6'}>
           <Outlet />
         </main>
-        <footer className="border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500 dark:border-slate-800">
-          CodeForge Academy — runs locally. Your code executes on this machine; runtimes are detected, never faked.
-        </footer>
+        {!isWorkspace && (
+          <footer className="border-t border-line px-4 py-3 text-center text-xs text-muted">
+            CodeForge Academy — runs locally. Your code executes on this machine; runtimes are detected, never faked.
+          </footer>
+        )}
       </div>
     </div>
   );
@@ -105,8 +159,8 @@ export function Layout() {
 export function Page({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+      <h1 className="text-xl font-bold">{title}</h1>
+      {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       <div className="mt-5">{children}</div>
     </div>
   );

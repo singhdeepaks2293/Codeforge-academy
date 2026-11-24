@@ -4,6 +4,8 @@ import Editor from '@monaco-editor/react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
+import { useTheme } from '../lib/theme';
+import { codeForgeTheme, setupCodeForgeThemes } from '../lib/monacoTheme';
 
 interface AssessmentData {
   assessment: {
@@ -17,6 +19,7 @@ interface AssessmentData {
 
 export function AssessmentPage() {
   const { courseSlug } = useParams();
+  const theme = useTheme();
   const [data, setData] = useState<AssessmentData | null>(null);
   const [error, setError] = useState('');
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -36,7 +39,7 @@ export function AssessmentPage() {
     }).catch((e) => setError(e.message));
   }, [courseSlug]);
 
-  if (error) return <Page title="Mastery assessment"><p role="alert" className="text-red-600">{error}</p></Page>;
+  if (error) return <Page title="Mastery assessment"><p role="alert" className="text-danger">{error}</p></Page>;
   if (!data) return <Page title="Mastery assessment"><p>Loading assessment…</p></Page>;
   const a = data.assessment;
 
@@ -66,13 +69,13 @@ export function AssessmentPage() {
         </div>
       )}
       {result && (
-        <div className={`card mb-4 p-4 ${result.passed ? 'border-green-500' : 'border-red-400'}`}>
+        <div className={`card mb-4 p-4 ${result.passed ? 'border-success' : 'border-danger'}`}>
           <h2 className="text-lg font-bold">{result.passed ? '🎉 Passed!' : 'Not yet — keep going'}</h2>
           <p>Score: {result.scorePercent}% ({result.correct}/{result.total} items) · Pass mark: {result.passPercent}%</p>
           {result.weakTopics.length > 0 && <p className="mt-1 text-sm">Weak topics to revisit: <strong>{result.weakTopics.join(', ')}</strong></p>}
           <div className="mt-2 space-y-1">
             {result.feedback.map((f) => (
-              <p key={f.questionId} className={`text-sm ${f.correct ? 'text-green-600' : 'text-red-600'}`}>{f.correct ? '✓' : '✗'} {f.explanation}</p>
+              <p key={f.questionId} className={`text-sm ${f.correct ? 'text-success' : 'text-danger'}`}>{f.correct ? '✓' : '✗'} {f.explanation}</p>
             ))}
           </div>
         </div>
@@ -81,7 +84,7 @@ export function AssessmentPage() {
         {a.questions.map((q, i) => (
           <div key={q.id} className="card p-4">
             <p className="text-sm font-semibold">{i + 1}. [{q.kind} · {q.topic}] {q.question}</p>
-            {q.code && <pre className="mt-2 overflow-auto rounded-lg bg-navy-950 p-3 text-xs text-green-300">{q.code}</pre>}
+            {q.code && <pre className="mt-2 overflow-auto rounded-lg bg-code p-3 text-xs text-success">{q.code}</pre>}
             <div className="mt-2 space-y-1">
               {q.options.map((o, oi) => (
                 <label key={oi} className="flex items-center gap-2 text-sm">
@@ -99,9 +102,9 @@ export function AssessmentPage() {
           <div key={ex.id} className="card p-4">
             <p className="font-semibold">{i + 1}. {ex.title}</p>
             <p className="mt-1 text-sm">{ex.instructions}</p>
-            <p className="mt-1 text-xs text-slate-500">Tests: {ex.tests.map((t) => t.name).join(', ')}</p>
+            <p className="mt-1 text-xs text-muted">Tests: {ex.tests.map((t) => t.name).join(', ')}</p>
             <div className="mt-2 min-h-[180px]">
-              <Editor height="180px" language={ex.language === 'python' ? 'python' : 'typescript'} value={code[ex.id] || ''} onChange={(v) => setCode({ ...code, [ex.id]: v || '' })} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 13 }} />
+              <Editor height="180px" language={ex.language === 'python' ? 'python' : 'typescript'} value={code[ex.id] || ''} onChange={(v) => setCode({ ...code, [ex.id]: v || '' })} theme={codeForgeTheme(theme)} beforeMount={setupCodeForgeThemes} options={{ minimap: { enabled: false }, fontSize: 13 }} />
             </div>
           </div>
         ))}
@@ -113,7 +116,7 @@ export function AssessmentPage() {
         <ul className="list-disc pl-5 text-sm">{a.capstone.requirements.map((r, i) => <li key={i}>{r}</li>)}</ul>
         <h3 className="mt-2 text-sm font-semibold">Rubric</h3>
         <ul className="list-disc pl-5 text-sm">{a.capstone.rubric.map((r, i) => <li key={i}>{r}</li>)}</ul>
-        <p className="mt-2 text-sm text-slate-500">Build the capstone as a project and submit it in the Project Academy for instructor review.</p>
+        <p className="mt-2 text-sm text-muted">Build the capstone as a project and submit it in the Project Academy for instructor review.</p>
       </div>
       <button className="btn-primary mt-4" onClick={submit} disabled={submitting}>{submitting ? 'Grading…' : 'Submit assessment'}</button>
       <Link className="btn-secondary ml-2" to={`/courses/${courseSlug}`}>Back to course</Link>

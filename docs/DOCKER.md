@@ -55,29 +55,52 @@ Local (no-Docker) defaults are intentionally different: backend :8080, frontend 
 
 ## Runtimes in the Docker image
 
-| Language | In the image? | Notes |
-|---|---|---|
-| Python 3 | Yes (`python3`) | |
-| C / C++ | Yes (`gcc`, `g++`) | |
-| TypeScript / JavaScript | Yes (Node + bundled `typescript`) | |
-| React | Yes (TSX transpile + server-render smoke test) | Same scope as local: SSR smoke test, not a browser DOM run |
-| Go | Yes (`golang-go` from Debian) | |
-| Java | Yes (`default-jre-headless`, single-file launch) | No `javac` — source files run via `java Main.java` |
-| Bash / Perl | Yes (`bash`, `perl`) | |
-| SQL | Yes (in-process `node:sqlite`) | No install needed |
-| Assembly (x86-64) | Yes (`gcc` as assembler/linker) | |
-| Rust | **No** | The API reports `runtime_unavailable` with install instructions. Rust toolchains via rustup are ~1 GB; to add Rust, extend `backend/Dockerfile` with a rustup install (see note below) or run the local path where `~/.cargo/bin/rustc` is detected. |
-| C# / Kotlin / Swift / Ruby / PHP / Dart / Scala / Haskell / Elixir / Lua / R / Julia / Solidity | **No** | Those tracks' code exercises return honest 503 `runtime_unavailable`; their quiz exercises still grade by answer. |
+Every language used by the 100 tracks, DSA and projects has a defined provisioning path — baked into the image, auto-installable on a local/dev host, or explicitly manual-only. Nothing is silently missing. The source of truth is `backend/src/services/provisioning.ts` (`RUNTIME_CATALOG` + `LANGUAGE_TO_RUNTIME`); `scripts/check-runtime-coverage.mjs` (run by `make verify`) fails the build if any track language has no path.
 
-Optional Rust layer (unverified here — Docker is not available in the build sandbox):
+| Language / track | Runtime | Docker image | Local/dev host | Notes |
+|---|---|---|---|---|
+| Python 3 | `python3` | **Baked** (`python3`) | present | |
+| C / Assembly | `gcc` | **Baked** (`gcc`, `build-essential`) | apt/dnf/brew/choco | asm is assembled + linked by gcc |
+| C++ | `g++` | **Baked** (`g++`, `build-essential`) | apt/dnf/brew/choco | |
+| TypeScript / JavaScript / React | `node` | **Baked** (base image) | present (backend needs Node) | React = TSX transpile + SSR smoke test |
+| Go | `go` | **Baked** (`golang-go`) | apt/dnf/brew/choco | |
+| Rust | `rustc` | **Baked** (`rustc`, `cargo`) | apt `rustc cargo`, else rustup | Bookworm ships Rust 1.63; rustup gets stable on local hosts |
+| Java | `java` | **Baked** (`default-jre-headless`) | apt/dnf/brew/choco | Single-file launch — no `javac` needed |
+| Bash | `bash` | **Baked** (base image) | present | |
+| Perl | `perl` | **Baked** (`perl`) | apt/dnf/brew/choco | |
+| SQL | in-process | **Built-in** (`node:sqlite`) | — | No install ever needed |
+| HTML | static check | **Built-in** | — | Tag-balance validation, not a browser render |
+| PHP | `php` | **Baked** (`php-cli`) | apt/dnf/brew/choco | |
+| Ruby | `ruby` | **Baked** (`ruby`) | apt/dnf/brew/choco | |
+| Lua | `lua` | **Baked** (`lua5.4` + `lua` symlink) | apt/dnf/brew/choco | |
+| Elixir | `elixir` | **Baked** (`elixir`) | apt/dnf/brew/choco | Erlang pulled in by the package manager |
+| R | `Rscript` | **Baked** (`r-base-core`) | apt/dnf/brew/choco | |
+| Haskell | `runghc` | **Baked** (`ghc`) | apt/dnf/brew/choco | The big one: ghc is ~650 MB installed |
+| Scala | `scala` | **Baked** (`scala`) | apt/brew/choco (no dnf package) | Needs the JRE above |
+| Solidity | `solc` | **Baked** (official static binary) | static-binary download | No apt package on bookworm |
+| Kotlin | `kotlinc` | **Baked** (official compiler zip) | compiler-zip download | Needs the JRE above |
+| C# | `dotnet` | Not in image | **Auto** (dotnet-install script) | Needs .NET 8 SDK; no apt package on bookworm |
+| Dart | `dart` | Not in image | **Auto** (official SDK zip) | |
+| Julia | `julia` | Not in image | **Auto** (official tarball, Linux) | |
+| Swift | `swift` | Not in image | **Manual only** | Platform-specific ~700 MB toolchains, no stable unattended installer; macOS: Xcode; Linux: swift.org toolchain for your distro |
+| Objective-C | `clang` | Not in image | **Manual only** | macOS: Xcode; Linux: GNUstep. No single-file ObjC runner exists yet, so the track stays quiz-graded even with a toolchain |
+| MongoDB | `mongod` | Not in image | **Manual only** | A database service, not a code runner — the track is quiz-style |
+| Redis | `redis-server` | Not in image | **Manual only** | A service, not a code runner — the track is quiz-style |
 
-```dockerfile
-# in backend/Dockerfile, runtime stage, as root before USER node:
-# RUN apt-get update && apt-get install -y --no-install-recommends curl \
-#  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
-#  && rm -rf /var/lib/apt/lists/* /root/.rustup/tmp
-# ENV PATH="/root/.cargo/bin:${PATH}"
-```
+### Two deployment realities
+
+- **Docker:** the backend runs as the non-root `node` user, so runtime installs *cannot* work inside a running container. Provisioning there reports `install_unavailable` honestly; the Docker path is baking runtimes into the image (above). To add a runtime to Docker, extend `backend/Dockerfile` and rebuild.
+- **Local/dev:** when a learner enrols in a course (or opens a lesson) whose runtime is missing, the backend starts a background install (package manager first, official installer as fallback) and records `installing` → `ready` / `failed` / `install_unavailable` in SQLite (`runtime_provisioning` table), so a restart never re-triggers it. The lesson/enrol response never waits for the install. Auto-install can be disabled with `CODEFORGE_PROVISIONING_ENABLED=0` (then missing runtimes stay honestly unavailable). A run is never faked: while a runtime is missing, `POST /api/execute/run` still returns 503 `runtime_unavailable`.
+
+### Runtime status API
+
+- `GET /api/runtimes` (alias of `GET /api/execute/runtimes`) — every runtime with `available`, `version`, `installHint` and `provisioning: { state, kind, dockerBaked, reason, guidance }`. States: `unknown` / `present` / `installing` / `ready` / `failed` / `install_unavailable`.
+- `GET /api/provisioning` — the same statuses as a list; `GET /api/provisioning/:runtime` — one runtime.
+- `POST /api/provisioning/:runtime/install` (signed-in users only) — starts (or retries) an install in the background; 202 when a new install starts, 200 otherwise, with the current status in the body.
+
+### Size note
+
+The baked apt set adds roughly 1.0–1.3 GB over the previous image, dominated by ghc (~650 MB installed), rustc/cargo + LLVM (~200 MB) and R (~150 MB with dependencies). That is the deliberate cost of covering every track in the image; the numbers are estimates from the packages' Installed-Size fields and have **not** been measured from a real `docker build` here (no Docker in the build sandbox).
 
 ## Troubleshooting
 

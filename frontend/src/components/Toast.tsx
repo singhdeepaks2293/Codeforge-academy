@@ -16,7 +16,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t) => (
           <div key={t.id} role="alert"
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg ${t.kind === 'success' ? 'bg-green-600' : t.kind === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
+            className={`rounded-lg border border-line px-4 py-2 text-sm font-medium shadow-md transition-all duration-200 ${t.kind === 'success' ? 'bg-success text-white' : t.kind === 'error' ? 'bg-danger text-white' : 'bg-elevated text-ink'}`}>
             {t.message}
           </div>
         ))}

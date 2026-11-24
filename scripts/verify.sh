@@ -9,6 +9,8 @@ echo "== backend tests =="
 npm run test --workspace=backend
 echo "== backend build =="
 npm run build --workspace=backend
+echo "== runtime coverage check (every track language needs a provisioning path) =="
+node scripts/check-runtime-coverage.mjs
 echo "== frontend tests =="
 npm run test --workspace=frontend
 echo "== frontend build =="

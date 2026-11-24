@@ -2,14 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-.dark { color-scheme: dark; }
-body { @apply bg-slate-50 text-slate-900 dark:bg-navy-950 dark:text-slate-100; }
-.card { @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-navy-900; }
-.btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50; }
-.btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
-.btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-navy-800 dark:text-slate-200 dark:hover:bg-navy-800; }
-.btn-ghost { @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-800; }
-.input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-navy-800; }
-.label { @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300; }
+/*
+ * CodeForge Academy — warm Ubuntu-GNOME-inspired theme.
+ * Never pure black (#000) backgrounds or pure white (#FFF) text.
+ * :root is the light theme; .dark is the dark theme. Tailwind tokens in
+ * tailwind.config.js read these variables, so one class works in both.
+ */
+:root {
+  color-scheme: light;
+  --base: 244 241 236;      /* warm off-white app background */
+  --sidebar: 238 233 226;   /* soft grey-purple sidebar */
+  --surface: 251 249 247;   /* soft warm panels */
+  --elevated: 255 253 251;  /* warm near-white raised surfaces */
+  --code: 239 233 228;      /* code block background */
+  --ink: 42 37 48;          /* main text */
+  --muted: 110 101 120;     /* secondary text */
+  --faint: 141 131 151;     /* tertiary text */
+  --line: 42 37 48;         /* borders, used at 9% alpha */
+  --accent-400: 169 112 245;
+  --accent-500: 139 79 224; /* muted violet primary */
+  --accent-600: 116 64 194;
+  --accent-700: 94 52 163;
+  --brand: 231 138 69;      /* warm orange brand accent */
+  --brand-50: 253 243 234;
+  --brand-600: 217 119 54;
+  --brand-700: 193 101 42;
+  --success: 31 122 68;
+  --danger: 179 64 47;
+  --warning: 166 110 20;
+}
+
+.dark {
+  color-scheme: dark;
+  --base: 36 33 41;         /* warm charcoal #242129 */
+  --sidebar: 43 39 49;      /* #2B2731 */
+  --surface: 51 46 57;      /* #332E39 */
+  --elevated: 57 51 64;     /* #393340 */
+  --code: 38 33 43;         /* warm dark code background, not black */
+  --ink: 241 237 245;       /* #F1EDF5 */
+  --muted: 185 176 196;     /* #B9B0C4 */
+  --faint: 138 129 148;
+  --line: 255 255 255;      /* borders, used at 9% alpha */
+  --accent-400: 192 132 252; /* #C084FC */
+  --accent-500: 169 112 245; /* #A970F5 */
+  --accent-600: 146 88 224;
+  --accent-700: 122 69 196;
+  --brand: 231 138 69;      /* #E78A45 */
+  --brand-50: 62 46 36;
+  --brand-600: 217 119 54;
+  --brand-700: 232 154 94;
+  --success: 139 211 160;
+  --danger: 217 122 122;
+  --warning: 232 180 100;
+}
+
+body {
+  @apply bg-base font-sans text-ink antialiased;
+  line-height: 1.55;
+}
+
+h1, h2, h3, h4 { line-height: 1.3; }
+
+::selection { background: rgb(var(--accent-500) / 0.28); }
+
+/* Thin, quiet scrollbars that match the theme. */
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--muted) / 0.45) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgb(var(--muted) / 0.35); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+.card { @apply rounded-xl border border-line bg-surface shadow-sm; }
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-50; }
+.btn-primary { @apply btn bg-accent-500 text-white hover:bg-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500; }
+.btn-secondary { @apply btn border border-line bg-elevated text-ink hover:bg-surface; }
+.btn-ghost { @apply btn text-muted hover:bg-elevated hover:text-ink; }
+.btn-danger { @apply btn bg-danger text-white hover:opacity-90; }
+.input { @apply w-full rounded-lg border border-line bg-elevated px-3 py-2 text-sm text-ink outline-none transition-colors duration-200 placeholder:text-faint focus:border-accent-500 focus:ring-2 focus:ring-accent-500/25; }
+.label { @apply mb-1 block text-sm font-medium text-muted; }
 .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+
+/* Subtle focus ring everywhere, violet, no glow. */
+:focus-visible { outline: 2px solid rgb(var(--accent-500) / 0.6); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

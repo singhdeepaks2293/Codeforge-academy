@@ -9,6 +9,7 @@ A locally hosted, interactive programming learning platform — inspired by Code
 - **100 tracks, 1354 lessons** — the original 7 language tracks (C, C++, Python, TypeScript, React, Rust, Go) plus 93 more across Languages, Web & Frontend, Mobile, Data/AI/ML, Databases & Backend, DevOps/Cloud/Systems, and CS Foundations & Career. The 7 original tracks end in a full mastery assessment (40 questions + 5 programming exercises + capstone, pass 80%); each new track ends in a short assessment (10 questions + 1 programming exercise + capstone, pass 80%).
 - **Interactive learning workspace** — three-panel layout: curriculum nav, lesson content, Monaco editor with Run / Reset / Submit, real compiler output, test results and a 5-level progressive hint system. Quiz-style exercises (multiple-choice / predict-output) are graded by answer on the server — no code is pretended to run.
 - **Real code execution** — Python (CPython), C/C++ (gcc/g++), TypeScript/JavaScript (Node + bundled TypeScript), Go, Rust (rustc), Java (single-file launch, JDK 11+), Bash, Perl, SQL (in-process SQLite), x86-64 Assembly (gcc), HTML (static tag validation), React (TSX transpile + server-render smoke test). Missing runtimes are reported honestly with install instructions — a run is never faked. See [docs/CURRICULUM.md](docs/CURRICULUM.md) for per-track runtime support.
+- **Runtime auto-provisioning** — every language used by the 100 tracks, DSA and projects has a defined path: baked into the Docker image, auto-installed in the background when you start a course on a local/dev host, or explicitly manual-only with exact steps (Swift, Objective-C, MongoDB/Redis). Enrolling or opening a lesson kicks off a missing runtime's install without blocking you; `GET /api/runtimes` shows each runtime's state (`present` / `installing` / `ready` / `failed` / `install_unavailable`). Full matrix: [docs/DOCKER.md](docs/DOCKER.md#runtimes-in-the-docker-image).
 - **DSA platform** — 10-level curriculum, interactive visualizations (merge/quick sort, binary search, stack, queue, BST, graph BFS, DP table) with play/pause/step/speed controls, and a 150+ problem library with visible + hidden tests.
 - **Project Academy** — 38 guided projects in 4 levels, from CLI tools to industry simulations (production REST API, full-stack SaaS, distributed job processing, compiler/interpreter, mini database, capstone), with milestones, acceptance criteria, code-review checklists and instructor review.
 - **IAM** — registration, bcrypt password hashing, HttpOnly SameSite session cookies, CSRF protection, login throttling + 15-minute lockout, password reset (local token flow), session revocation, first-run setup wizard (no default admin credentials), RBAC (student / instructor / admin / super-admin) with 14 permission strings enforced in the backend, and a full audit log.
@@ -48,7 +49,7 @@ docker compose down      # stop, keep data
 docker compose down -v   # stop AND DELETE all users, progress and data
 ```
 
-Full Docker instructions, port changes and the Rust note: [docs/DOCKER.md](docs/DOCKER.md).
+Full Docker instructions, port changes and the runtime matrix: [docs/DOCKER.md](docs/DOCKER.md).
 
 | Path | Frontend | Backend | Database |
 |---|---|---|---|
@@ -73,7 +74,7 @@ See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for the verification lo
 ## Documentation
 
 - [docs/INSTALL.md](docs/INSTALL.md) — local setup, runtimes, troubleshooting
-- [docs/DOCKER.md](docs/DOCKER.md) — Docker run path, ports, volumes, Rust note
+- [docs/DOCKER.md](docs/DOCKER.md) — Docker run path, ports, volumes, runtime matrix
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design, module map
 - [docs/API.md](docs/API.md) — REST API reference
 - [docs/IAM.md](docs/IAM.md) — authentication, roles, permissions, audit

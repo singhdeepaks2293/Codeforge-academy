@@ -25,7 +25,7 @@ export function DashboardPage() {
     api<DashboardData>('/api/progress/dashboard').then(setData).catch((e) => setError(e.message));
   }, []);
 
-  if (error) return <Page title="Dashboard"><p role="alert" className="text-red-600">{error}</p></Page>;
+  if (error) return <Page title="Dashboard"><p role="alert" className="text-danger">{error}</p></Page>;
   if (!data) return <Page title="Dashboard"><p>Loading your learning dashboard…</p></Page>;
 
   const enrolled = data.courses.filter((c) => c.enrolled);
@@ -37,24 +37,24 @@ export function DashboardPage() {
   return (
     <Page title={`Welcome back, ${user?.displayName ?? 'learner'} 👋`} subtitle="Learn → Understand → Practice → Debug → Master → DSA → Build Projects → Become Industry Ready">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card p-4"><div className="text-sm text-slate-500">Total XP</div><div className="text-3xl font-bold text-brand-600">{data.xp}</div><div className="text-xs text-slate-500">Today: {data.todayXp} / {data.dailyGoal} daily goal</div>
-          <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-navy-800"><div className="h-2 rounded bg-brand-600" style={{ width: `${Math.min(100, (data.todayXp / data.dailyGoal) * 100)}%` }} /></div></div>
-        <div className="card p-4"><div className="text-sm text-slate-500">Learning streak</div><div className="text-3xl font-bold">🔥 {data.streak} {data.streak === 1 ? 'day' : 'days'}</div><div className="text-xs text-slate-500">Keep it alive — learn a little every day</div></div>
-        <div className="card p-4"><div className="text-sm text-slate-500">Completion</div><div className="text-3xl font-bold">{pct}%</div><div className="text-xs text-slate-500">{doneLessons} of {totalLessons} lessons completed</div>
-          <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-navy-800"><div className="h-2 rounded bg-green-600" style={{ width: `${pct}%` }} /></div></div>
-        <div className="card p-4"><div className="text-sm text-slate-500">DSA · Projects</div><div className="text-3xl font-bold">{data.dsa.solved} / {data.dsa.total}</div><div className="text-xs text-slate-500">Problems solved · {data.projectsCompleted} projects completed</div></div>
+        <div className="card p-4"><div className="text-sm text-muted">Total XP</div><div className="text-3xl font-bold text-accent-600">{data.xp}</div><div className="text-xs text-muted">Today: {data.todayXp} / {data.dailyGoal} daily goal</div>
+          <div className="mt-2 h-2 rounded bg-line"><div className="h-2 rounded bg-accent-500" style={{ width: `${Math.min(100, (data.todayXp / data.dailyGoal) * 100)}%` }} /></div></div>
+        <div className="card p-4"><div className="text-sm text-muted">Learning streak</div><div className="text-3xl font-bold">🔥 {data.streak} {data.streak === 1 ? 'day' : 'days'}</div><div className="text-xs text-muted">Keep it alive — learn a little every day</div></div>
+        <div className="card p-4"><div className="text-sm text-muted">Completion</div><div className="text-3xl font-bold">{pct}%</div><div className="text-xs text-muted">{doneLessons} of {totalLessons} lessons completed</div>
+          <div className="mt-2 h-2 rounded bg-line"><div className="h-2 rounded bg-success" style={{ width: `${pct}%` }} /></div></div>
+        <div className="card p-4"><div className="text-sm text-muted">DSA · Projects</div><div className="text-3xl font-bold">{data.dsa.solved} / {data.dsa.total}</div><div className="text-xs text-muted">Problems solved · {data.projectsCompleted} projects completed</div></div>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="card p-4">
           <h2 className="text-lg font-bold">Continue learning</h2>
-          {enrolled.length === 0 && <p className="mt-2 text-sm text-slate-500">You have not enrolled in a course yet.</p>}
+          {enrolled.length === 0 && <p className="mt-2 text-sm text-muted">You have not enrolled in a course yet.</p>}
           {enrolled.map((c) => (
-            <div key={c.slug} className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 first:border-0 dark:border-slate-800">
+            <div key={c.slug} className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3 first:border-0">
               <div>
                 <div className="font-semibold">{c.title}</div>
-                <div className="text-xs text-slate-500">{c.completed_lessons}/{c.total_lessons} lessons {c.mastery_passed ? '· 🏆 Mastery passed' : ''}</div>
-                <div className="mt-1 h-1.5 w-48 rounded bg-slate-200 dark:bg-navy-800"><div className="h-1.5 rounded bg-brand-600" style={{ width: `${c.total_lessons ? (c.completed_lessons / c.total_lessons) * 100 : 0}%` }} /></div>
+                <div className="text-xs text-muted">{c.completed_lessons}/{c.total_lessons} lessons {c.mastery_passed ? '· 🏆 Mastery passed' : ''}</div>
+                <div className="mt-1 h-1.5 w-48 rounded bg-line"><div className="h-1.5 rounded bg-accent-500" style={{ width: `${c.total_lessons ? (c.completed_lessons / c.total_lessons) * 100 : 0}%` }} /></div>
               </div>
               <Link className="btn-primary" to={`/courses/${c.slug}`}>Continue →</Link>
             </div>
@@ -64,15 +64,15 @@ export function DashboardPage() {
 
         <div className="card p-4">
           <h2 className="text-lg font-bold">Last 14 days of activity</h2>
-          {data.activity.length === 0 && <p className="mt-2 text-sm text-slate-500">No activity yet — complete a lesson to start your chart.</p>}
+          {data.activity.length === 0 && <p className="mt-2 text-sm text-muted">No activity yet — complete a lesson to start your chart.</p>}
           <div className="mt-3 flex h-28 items-end gap-1">
             {[...data.activity].reverse().map((a) => (
-              <div key={a.activity_date} className="flex-1 rounded-t bg-brand-600" style={{ height: `${Math.max(4, (a.xp / maxXp) * 100)}%` }} title={`${a.activity_date}: ${a.xp} XP, ${a.lessons_completed} lessons`} />
+              <div key={a.activity_date} className="flex-1 rounded-t bg-accent-500" style={{ height: `${Math.max(4, (a.xp / maxXp) * 100)}%` }} title={`${a.activity_date}: ${a.xp} XP, ${a.lessons_completed} lessons`} />
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-xs text-slate-500"><span>14 days ago</span><span>today</span></div>
+          <div className="mt-1 flex justify-between text-xs text-muted"><span>14 days ago</span><span>today</span></div>
           <h3 className="mt-5 font-semibold">Recently completed lessons</h3>
-          {data.recentLessons.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
+          {data.recentLessons.length === 0 && <p className="text-sm text-muted">None yet.</p>}
           <ul className="mt-1 list-disc pl-5 text-sm">{data.recentLessons.map((l) => <li key={l.id}>{l.title}</li>)}</ul>
         </div>
       </div>
@@ -85,7 +85,7 @@ export function DashboardPage() {
               const earned = data.achievements.find((x) => x.id === a.id);
               return (
                 <span key={a.id} title={earned ? `Earned ${earned.earned_at}` : a.description}
-                  className={`badge ${earned ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' : 'bg-slate-100 text-slate-400 dark:bg-navy-800'}`}>
+                  className={`badge ${earned ? 'bg-warning-soft text-warning' : 'bg-elevated text-faint'}`}>
                   {a.icon} {a.title}
                 </span>
               );
@@ -96,11 +96,11 @@ export function DashboardPage() {
         <div className="card p-4">
           <h2 className="text-lg font-bold">Recommended for you</h2>
           {data.weakTopics.length === 0
-            ? <p className="mt-2 text-sm text-slate-500">No weak topics detected yet. Solve a few DSA problems and your recommendations will appear here, based on your real pass rates.</p>
+            ? <p className="mt-2 text-sm text-muted">No weak topics detected yet. Solve a few DSA problems and your recommendations will appear here, based on your real pass rates.</p>
             : (
               <ul className="mt-2 space-y-2 text-sm">
                 {data.weakTopics.map((w) => (
-                  <li key={w.topic} className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
+                  <li key={w.topic} className="rounded-lg bg-warning-soft p-3">
                     You are struggling with <strong>{w.topic}</strong> ({Math.round(w.passRate * 100)}% pass rate over {w.attempts} attempts). Revisit the {w.topic} lessons and try easier problems first.
                   </li>
                 ))}

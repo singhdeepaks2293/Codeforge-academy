@@ -37,13 +37,13 @@ export function SetupPage() {
     <div className="mx-auto max-w-lg">
       <div className="card p-6">
         <h1 className="text-2xl font-bold">Welcome to CodeForge Academy</h1>
-        <p className="mt-2 text-sm text-slate-500">First-run setup. Create the initial administrator account. No default admin credentials exist — this wizard disables itself after setup. To reset the local environment, delete <code>data/codeforge.db</code> and restart the server.</p>
-        {done ? <p className="mt-4 font-semibold text-green-600">Setup complete — redirecting to your dashboard…</p> : (
+        <p className="mt-2 text-sm text-muted">First-run setup. Create the initial administrator account. No default admin credentials exist — this wizard disables itself after setup. To reset the local environment, delete <code>data/codeforge.db</code> and restart the server.</p>
+        {done ? <p className="mt-4 font-semibold text-success">Setup complete — redirecting to your dashboard…</p> : (
           <form onSubmit={submit} className="mt-5 space-y-4">
             <div><label className="label" htmlFor="name">Display name</label><input id="name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required /></div>
             <div><label className="label" htmlFor="email">Email</label><input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
             <div><label className="label" htmlFor="pw">Password (min 8 chars, upper + lower + digit)</label><input id="pw" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-            {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+            {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <button className="btn-primary w-full" type="submit">Create administrator & finish setup</button>
           </form>
         )}
@@ -83,17 +83,17 @@ export function LoginPage() {
     <div className="mx-auto max-w-md">
       <div className="card p-6">
         <h1 className="text-2xl font-bold">Sign in</h1>
-        {setupNeeded && <p className="mt-2 text-sm">This platform has not been set up yet. <Link className="font-semibold text-brand-600" to="/setup">Run first-run setup →</Link></p>}
+        {setupNeeded && <p className="mt-2 text-sm">This platform has not been set up yet. <Link className="font-semibold text-accent-600" to="/setup">Run first-run setup →</Link></p>}
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div><label className="label" htmlFor="email">Email</label><input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
           <div><label className="label" htmlFor="pw">Password</label><input id="pw" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} /> Remember me (30 days)</label>
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
           <button className="btn-primary w-full" type="submit">Sign in</button>
         </form>
         <div className="mt-4 flex justify-between text-sm">
-          <Link className="text-brand-600" to="/register">Create an account</Link>
-          <Link className="text-brand-600" to="/forgot-password">Forgot password?</Link>
+          <Link className="text-accent-600" to="/register">Create an account</Link>
+          <Link className="text-accent-600" to="/forgot-password">Forgot password?</Link>
         </div>
       </div>
     </div>
@@ -126,15 +126,15 @@ export function RegisterPage() {
     <div className="mx-auto max-w-md">
       <div className="card p-6">
         <h1 className="text-2xl font-bold">Create your account</h1>
-        <p className="mt-1 text-sm text-slate-500">Free, local, no cloud account needed. Passwords are hashed with bcrypt — never stored in plain text.</p>
+        <p className="mt-1 text-sm text-muted">Free, local, no cloud account needed. Passwords are hashed with bcrypt — never stored in plain text.</p>
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div><label className="label" htmlFor="name">Display name</label><input id="name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required /></div>
           <div><label className="label" htmlFor="email">Email</label><input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
           <div><label className="label" htmlFor="pw">Password (min 8 chars, upper + lower + digit)</label><input id="pw" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" /></div>
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
           <button className="btn-primary w-full" type="submit">Create account</button>
         </form>
-        <p className="mt-4 text-sm">Already have an account? <Link className="text-brand-600" to="/login">Sign in</Link></p>
+        <p className="mt-4 text-sm">Already have an account? <Link className="text-accent-600" to="/login">Sign in</Link></p>
       </div>
     </div>
   );
@@ -156,14 +156,14 @@ export function ForgotPasswordPage() {
     <div className="mx-auto max-w-md">
       <div className="card p-6">
         <h1 className="text-2xl font-bold">Reset password</h1>
-        <p className="mt-1 text-sm text-slate-500">Local deployment has no mail server, so the reset token is shown here after you submit.</p>
+        <p className="mt-1 text-sm text-muted">Local deployment has no mail server, so the reset token is shown here after you submit.</p>
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div><label className="label" htmlFor="email">Email</label><input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          {result && <p className="break-all rounded bg-slate-100 p-3 text-sm dark:bg-navy-800">{result}</p>}
+          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+          {result && <p className="break-all rounded bg-elevated p-3 text-sm">{result}</p>}
           <button className="btn-primary w-full" type="submit">Request reset token</button>
         </form>
-        <Link className="mt-4 block text-sm text-brand-600" to="/reset-password">I have a token — set a new password →</Link>
+        <Link className="mt-4 block text-sm text-accent-600" to="/reset-password">I have a token — set a new password →</Link>
       </div>
     </div>
   );
@@ -191,8 +191,8 @@ export function ResetPasswordPage() {
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div><label className="label" htmlFor="token">Reset token</label><input id="token" className="input" value={token} onChange={(e) => setToken(e.target.value)} required /></div>
           <div><label className="label" htmlFor="pw">New password</label><input id="pw" type="password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          {msg && <p className="text-sm text-green-600">{msg}</p>}
+          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+          {msg && <p className="text-sm text-success">{msg}</p>}
           <button className="btn-primary w-full" type="submit">Reset password</button>
         </form>
       </div>

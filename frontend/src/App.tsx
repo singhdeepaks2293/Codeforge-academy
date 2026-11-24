@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { applyTheme, getTheme } from './lib/theme';
 import { ToastProvider } from './components/Toast';
 import { Layout } from './components/Layout';
 import { SetupPage, LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage, NotFoundPage } from './pages/AuthPages';
@@ -11,7 +12,7 @@ import { DsaListPage, DsaProblemPage } from './pages/Dsa';
 import { ProjectsPage, ProjectDetailPage } from './pages/Projects';
 import { AssessmentPage } from './pages/Assessment';
 import { AchievementsPage, ProgressPage, ProfilePage, SettingsPage } from './pages/LearnPages';
-import { AdminDashboardPage, AdminUsersPage, AdminRolesPage, AdminCurriculumPage, AdminSubmissionsPage, AdminAuditPage, AdminSettingsPage } from './pages/Admin';
+import { AdminDashboardPage, AdminUsersPage, AdminRolesPage, AdminCurriculumPage, AdminSubmissionsPage, AdminAuditPage, AdminSettingsPage, AdminRuntimesPage } from './pages/Admin';
 import type { ReactElement } from 'react';
 
 function RequireAuth({ children }: { children: ReactElement }) {
@@ -23,12 +24,9 @@ function RequireAuth({ children }: { children: ReactElement }) {
 }
 
 function ThemeInit() {
-  useEffect(() => {
-    const saved = localStorage.getItem('cf-theme');
-    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
+  // Dark is the default; only a saved 'light' opts out. The same check runs
+  // in index.html before first paint to avoid a theme flash.
+  useEffect(() => { applyTheme(getTheme()); }, []);
   return null;
 }
 
@@ -66,6 +64,7 @@ export default function App() {
               <Route path="/admin/curriculum" element={<AdminCurriculumPage />} />
               <Route path="/admin/submissions" element={<AdminSubmissionsPage />} />
               <Route path="/admin/audit" element={<AdminAuditPage />} />
+              <Route path="/admin/runtimes" element={<AdminRuntimesPage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />

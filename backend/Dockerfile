@@ -1,11 +1,39 @@
 # CodeForge Academy — backend image (multi-stage, Node 24)
 # Build:  docker build -t codeforge-backend ./backend
 # Run:    docker run -p 4000:4000 -v codeforge-data:/app/data -e SESSION_SECRET=... codeforge-backend
-# The image ships the real execution runtimes for Python, C, C++, Go, Java
-# (JRE — single-file source launch needs no javac), Perl and Bash/SQLite.
-# Rust is NOT installed in this image (rustup toolchains are ~1 GB); the API
-# reports rust as runtime_unavailable with install instructions until it is added.
-# See docs/DOCKER.md for the optional Rust layer.
+#
+# RUNTIME COVERAGE — every language used by the 100 tracks, DSA and projects
+# is either baked into this image, auto-installable on a local/dev host, or
+# explicitly manual-only. See docs/DOCKER.md for the full matrix and
+# backend/src/services/provisioning.ts (RUNTIME_CATALOG) for the source of
+# truth. The container runs as the non-root `node` user, so runtime installs
+# CANNOT happen inside a running container — baking into the image is the
+# Docker path; on-demand auto-install is for local/dev deployments only.
+#
+# Baked into this image (apt on Debian bookworm, + two official downloads):
+#   python3, gcc, g++ (build-essential: C/C++/asm + headers/libs), golang-go,
+#   default-jre-headless (Java single-file launch; no javac needed),
+#   perl, rustc + cargo (bookworm ships Rust 1.63 — older than rustup stable
+#   but fine for the lessons), php-cli, ruby, lua5.4 (+ `lua` symlink),
+#   elixir, r-base-core (Rscript), ghc (Haskell runghc — the big one,
+#   ~650 MB installed; kept because completeness beats size here),
+#   scala (needs the JRE above), solc (official static binary),
+#   kotlinc (official compiler zip; needs the JRE above).
+# Auto-installable on local/dev hosts only (NOT in this image):
+#   C# (.NET SDK via dotnet-install), Dart (official SDK zip),
+#   Julia (official tarball). See the provisioning service.
+# Manual-only everywhere (no unattended install exists):
+#   Swift (platform-specific ~700 MB toolchains), Objective-C (Xcode/GNUstep),
+#   MongoDB / Redis (services, not code runners — those tracks are quiz-style).
+# Built-in (no install ever needed): SQL (node:sqlite), HTML (static check).
+# Node.js itself (TS/JS/React) is the base image.
+#
+# Size note: the apt set adds roughly 1.0–1.3 GB over the previous image,
+# dominated by ghc (~650 MB), rustc/cargo + LLVM (~200 MB) and R (~150 MB
+# with dependencies). That is the deliberate cost of covering every track
+# in the image; the sizes are estimates from the packages' Installed-Size
+# fields and have NOT been measured from a real `docker build` here
+# (no Docker in the build sandbox — see docs/DOCKER.md).
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
@@ -17,12 +45,28 @@ RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
-# Real code-execution runtimes + tini for signal handling.
+# Real code-execution runtimes + tini for signal handling + curl/unzip for
+# the two official toolchain downloads below.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 gcc g++ golang-go default-jre-headless perl tini ca-certificates \
+  && apt-get install -y --no-install-recommends \
+    python3 gcc g++ build-essential golang-go default-jre-headless perl tini \
+    ca-certificates curl unzip \
+    rustc cargo php-cli ruby lua5.4 elixir r-base-core ghc scala \
   && rm -rf /var/lib/apt/lists/* \
+  && ln -sf /usr/bin/lua5.4 /usr/local/bin/lua \
   && mkdir -p /app/data /app/dist \
   && chown -R node:node /app
+# Solidity: official static binary (no apt package on bookworm).
+RUN curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.26/solc-static-linux \
+    -o /usr/local/bin/solc \
+  && chmod +x /usr/local/bin/solc
+# Kotlin: official compiler zip (no apt package on bookworm; needs the JRE above).
+RUN curl -fsSL https://github.com/JetBrains/kotlin/releases/download/v1.9.24/kotlin-compiler-1.9.24.zip \
+    -o /tmp/kotlin-compiler.zip \
+  && unzip -q /tmp/kotlin-compiler.zip -d /usr/local \
+  && ln -sf /usr/local/kotlinc/bin/kotlinc /usr/local/bin/kotlinc \
+  && ln -sf /usr/local/kotlinc/bin/kotlin /usr/local/bin/kotlin \
+  && rm /tmp/kotlin-compiler.zip
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

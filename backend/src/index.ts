@@ -11,6 +11,8 @@ import { authRouter } from './routes/auth.js';
 import { coursesRouter } from './routes/courses.js';
 import { executeRouter } from './routes/execute.js';
 import { adminRouter } from './routes/admin.js';
+import { provisioningRouter, runtimesHandler } from './routes/provisioning.js';
+import { restoreProvisionedPaths } from './services/provisioning.js';
 import { dsaRouter, projectsRouter, assessmentsRouter, progressRouter } from './routes/learn.js';
 
 const app = express();
@@ -24,10 +26,14 @@ app.get('/api/health', (_req, res) => {
 
 // Auth routes (login/register/setup are exempt from CSRF — they issue the CSRF cookie)
 app.use('/api/auth', authRouter);
+// /api/runtimes is the alias the executor's 503 message points at; the same
+// payload also lives at /api/execute/runtimes.
+app.get('/api/runtimes', runtimesHandler);
 // Mutating API routes require a valid double-submit CSRF token
 app.use('/api', csrfProtect);
 app.use('/api/courses', coursesRouter);
 app.use('/api/execute', executeRouter);
+app.use('/api/provisioning', provisioningRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/dsa', dsaRouter);
 app.use('/api/projects', projectsRouter);
@@ -55,6 +61,9 @@ const HOST = process.env.BIND_LAN === '1' ? '0.0.0.0' : (process.env.HOST || '12
 async function main() {
   const db = openDb(getDbPath());
   seedRolesAndPermissions(db);
+  // Re-add install dirs recorded by earlier provisioning runs to PATH so
+  // the executor keeps finding on-demand runtimes after a restart.
+  restoreProvisionedPaths(db);
   try {
     const counts = await seedCurriculum(db);
     console.log('[seed]', JSON.stringify(counts));

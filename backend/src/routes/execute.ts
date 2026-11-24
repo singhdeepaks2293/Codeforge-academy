@@ -3,14 +3,18 @@ import { z } from 'zod';
 import { getDbPath, openDb } from '../db/db.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { detectRuntimes, runCode, type RunResult } from '../execution/executor.js';
+import { buildRuntimesPayload } from '../services/provisioning.js';
 import { awardXp, xpFor, grantAchievement } from '../services/gamification.js';
 
 export const executeRouter = Router();
 const db = () => openDb(getDbPath());
 
+// Every catalog runtime (not just the ones detectRuntimes lists) with its
+// provisioning state — baked / auto-installable / manual / builtin — so a
+// learner can see why a runtime is missing and what happens next.
 executeRouter.get('/runtimes', async (_req, res) => {
-  const runtimes = await detectRuntimes();
-  res.json({ runtimes });
+  const payload = await buildRuntimesPayload(db());
+  res.json(payload);
 });
 
 const runSchema = z.object({

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getDbPath, openDb, audit, getConfig } from '../db/db.js';
 import { requireAuth, requirePermission, type AuthedRequest } from '../middleware/auth.js';
+import { ensureRuntimeForLanguage } from '../services/provisioning.js';
 import { awardXp, xpFor } from '../services/gamification.js';
 
 export const coursesRouter = Router();
@@ -55,14 +56,32 @@ coursesRouter.get('/:slug', (req, res) => {
   res.json({ course: { ...course, skills: parseJson(String(course.skills), []), prerequisites: parseJson(String(course.prerequisites), []) }, modules: modulesOut });
 });
 
-coursesRouter.get('/:slug/lessons/:lessonId', (req, res) => {
+coursesRouter.get('/:slug/lessons/:lessonId', async (req, res) => {
   const conn = db();
   const lesson = conn.prepare(`SELECT l.*, m.course_id AS course_id FROM lessons l
     JOIN modules m ON m.id = l.module_id WHERE l.id = ?`).get(req.params.lessonId) as Record<string, unknown> | undefined;
   if (!lesson) { res.status(404).json({ error: 'lesson not found' }); return; }
-  const course = conn.prepare('SELECT slug FROM courses WHERE id = ?').get(lesson.course_id) as { slug: string } | undefined;
+  const course = conn.prepare('SELECT slug, language FROM courses WHERE id = ?').get(lesson.course_id) as { slug: string; language: string } | undefined;
   if (course && course.slug !== req.params.slug) { res.status(404).json({ error: 'lesson not in this course' }); return; }
   const content = parseJson(String(lesson.content), {});
+  // First-lesson-open trigger: if this course's runtime is missing, kick off
+  // a background install so the learner's first Run can work. Never blocks
+  // the lesson response. For a signed-in user we only provision when they
+  // are actually enrolled; a public (anonymous) fetch cannot prove enrolment,
+  // so it provisions opportunistically — the install is idempotent and runs once.
+  if (course) {
+    const authed = req as unknown as { user?: { id: string } };
+    const runtimes = new Set<string>([course.language, String((content as { exampleLanguage?: string }).exampleLanguage || '')].filter(Boolean));
+    void (async () => {
+      try {
+        if (authed.user) {
+          const enrolled = conn.prepare('SELECT 1 FROM user_course_progress WHERE user_id = ? AND course_id = ? AND enrolled = 1').get(authed.user.id, lesson.course_id);
+          if (!enrolled) return;
+        }
+        for (const lang of runtimes) await ensureRuntimeForLanguage(conn, lang);
+      } catch { /* provisioning must never break lesson delivery */ }
+    })();
+  }
   const exercises = conn.prepare('SELECT * FROM exercises WHERE lesson_id = ?').all(lesson.id) as Record<string, unknown>[];
   const exercisesOut = exercises.map((e) => ({
     ...e,
@@ -77,12 +96,16 @@ coursesRouter.get('/:slug/lessons/:lessonId', (req, res) => {
 
 coursesRouter.post('/:slug/enroll', requireAuth, (req: AuthedRequest, res) => {
   const conn = db();
-  const course = conn.prepare('SELECT * FROM courses WHERE slug = ?').get(req.params.slug) as { id: string } | undefined;
+  const course = conn.prepare('SELECT * FROM courses WHERE slug = ?').get(req.params.slug) as { id: string; language: string } | undefined;
   if (!course) { res.status(404).json({ error: 'course not found' }); return; }
   const total = (conn.prepare('SELECT COUNT(*) AS n FROM lessons l JOIN modules m ON m.id = l.module_id WHERE m.course_id = ?').get(course.id) as { n: number }).n;
   conn.prepare(`INSERT INTO user_course_progress (user_id, course_id, enrolled, completed_lessons, total_lessons, mastery_passed)
     VALUES (?, ?, 1, 0, ?, 0) ON CONFLICT(user_id, course_id) DO UPDATE SET enrolled = 1, total_lessons = excluded.total_lessons`)
     .run(req.user!.id, course.id, total);
+  // Enrol trigger: provision the course's primary runtime in the background
+  // if it is missing. Fire-and-forget — the enrol response never waits for
+  // an install, and provisioning never blocks the learner.
+  void ensureRuntimeForLanguage(conn, course.language).catch(() => undefined);
   res.json({ ok: true });
 });
 

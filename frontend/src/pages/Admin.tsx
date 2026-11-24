@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
+import { fetchRuntimes, installRuntime, canInstall, kindLabel, provisioningStatusText, type RuntimeInfo } from '../lib/provisioning';
 import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
 
@@ -14,18 +15,19 @@ export function AdminDashboardPage() {
   }, []);
   return (
     <Page title="Admin Dashboard" subtitle="Platform health at a glance.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {Object.entries({ Users: stats.users, 'Active today': stats.activeToday, Lessons: stats.lessons, Submissions: stats.submissions, 'DSA solved': stats.dsaSolved }).map(([k, v]) => (
-            <div key={k} className="card p-4"><div className="text-sm text-slate-500">{k}</div><div className="text-3xl font-bold">{v}</div></div>
+            <div key={k} className="card p-4"><div className="text-sm text-muted">{k}</div><div className="text-3xl font-bold">{v}</div></div>
           ))}
         </div>
       )}
       <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <Link className="card p-4 hover:shadow-md" to="/admin/users"><h2 className="font-bold">Users & IAM →</h2><p className="text-sm text-slate-500">Search, create, suspend, assign roles.</p></Link>
-        <Link className="card p-4 hover:shadow-md" to="/admin/curriculum"><h2 className="font-bold">Course Management →</h2><p className="text-sm text-slate-500">Create courses and modules, manage lessons.</p></Link>
-        <Link className="card p-4 hover:shadow-md" to="/admin/audit"><h2 className="font-bold">Audit Logs →</h2><p className="text-sm text-slate-500">Every sensitive action, with actor and result.</p></Link>
+        <Link className="card p-4 hover:shadow-md" to="/admin/users"><h2 className="font-bold">Users & IAM →</h2><p className="text-sm text-muted">Search, create, suspend, assign roles.</p></Link>
+        <Link className="card p-4 hover:shadow-md" to="/admin/curriculum"><h2 className="font-bold">Course Management →</h2><p className="text-sm text-muted">Create courses and modules, manage lessons.</p></Link>
+        <Link className="card p-4 hover:shadow-md" to="/admin/runtimes"><h2 className="font-bold">Runtimes &amp; Provisioning →</h2><p className="text-sm text-muted">Which languages are ready, installing, or need a manual install.</p></Link>
+        <Link className="card p-4 hover:shadow-md" to="/admin/audit"><h2 className="font-bold">Audit Logs →</h2><p className="text-sm text-muted">Every sensitive action, with actor and result.</p></Link>
       </div>
     </Page>
   );
@@ -68,7 +70,7 @@ export function AdminUsersPage() {
 
   return (
     <Page title="User Management" subtitle="Search, filter, create users, assign roles, suspend or activate accounts.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <div className="mb-4 flex flex-wrap gap-2">
         <input className="input max-w-sm" placeholder="Search by email or name…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" />
         <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Filter by role">
@@ -81,7 +83,7 @@ export function AdminUsersPage() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b">
-                <td className="p-3"><div className="font-semibold">{u.displayName}</div><div className="text-xs text-slate-500">{u.email}</div></td>
+                <td className="p-3"><div className="font-semibold">{u.displayName}</div><div className="text-xs text-muted">{u.email}</div></td>
                 <td className="p-3">
                   <select className="input w-auto" value={u.role} onChange={(e) => setRoleFor(u, e.target.value)} aria-label={`Role for ${u.email}`}>
                     <option>student</option><option>instructor</option><option>admin</option><option>super-admin</option>
@@ -98,7 +100,7 @@ export function AdminUsersPage() {
             ))}
           </tbody>
         </table>
-        {users.length === 0 && <p className="p-4 text-slate-500">No users match.</p>}
+        {users.length === 0 && <p className="p-4 text-muted">No users match.</p>}
       </div>
       <div className="card mt-6 p-4">
         <h2 className="font-bold">Create user</h2>
@@ -141,18 +143,18 @@ export function AdminRolesPage() {
   };
   return (
     <Page title="Roles & Permissions" subtitle="Permission-based access control. System roles cannot be deleted; roles assigned to users cannot be deleted.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <div className="space-y-4">
         {roles.map((r) => (
           <div key={r.id} className="card p-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold">{r.name} {r.is_system ? <span className="badge bg-slate-100 text-slate-500">system</span> : ''}</h2>
+              <h2 className="font-bold">{r.name} {r.is_system ? <span className="badge bg-elevated text-muted">system</span> : ''}</h2>
               {!r.is_system && <button className="btn-secondary" onClick={() => remove(r.id)}>Delete role</button>}
             </div>
-            <p className="text-sm text-slate-500">{r.description}</p>
+            <p className="text-sm text-muted">{r.description}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {allPermissions.map((p) => (
-                <label key={p.name} className="flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700" title={p.description}>
+                <label key={p.name} className="flex items-center gap-1 rounded border border-line px-2 py-1 text-xs" title={p.description}>
                   <input type="checkbox" checked={r.permissions.includes(p.name)} onChange={() => toggle(r, p.name)} />
                   {p.name}
                 </label>
@@ -195,14 +197,14 @@ export function AdminCurriculumPage() {
   };
   return (
     <Page title="Course & Curriculum Management" subtitle="Create courses (draft), publish/unpublish, delete. Lessons and exercises are managed per course; seeded curriculum is versioned in the repository.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <div className="space-y-2">
         {courses.map((c) => (
           <div key={c.id} className="card flex flex-wrap items-center justify-between gap-2 p-4">
-            <div><span className="font-semibold">{c.title}</span> <span className="text-xs text-slate-500">({c.language} · {c.status})</span></div>
+            <div><span className="font-semibold">{c.title}</span> <span className="text-xs text-muted">({c.language} · {c.status})</span></div>
             <div className="flex gap-2">
               <button className="btn-secondary" onClick={() => setStatus(c, c.status === 'published' ? 'draft' : 'published')}>{c.status === 'published' ? 'Unpublish' : 'Publish'}</button>
-              <button className="btn-secondary text-red-600" onClick={() => remove(c)}>Delete</button>
+              <button className="btn-secondary text-danger" onClick={() => remove(c)}>Delete</button>
             </div>
           </div>
         ))}
@@ -236,13 +238,13 @@ export function AdminSubmissionsPage() {
   };
   return (
     <Page title="Project Submissions" subtitle="Review learner project submissions and give feedback.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
-      {subs.length === 0 && <div className="card p-6 text-center text-slate-500">No project submissions yet.</div>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
+      {subs.length === 0 && <div className="card p-6 text-center text-muted">No project submissions yet.</div>}
       <div className="space-y-2">
         {subs.map((s) => (
           <div key={s.id} className="card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span><strong>{s.project_id}</strong> · by {s.user_id} · {s.created_at} · <span className="badge bg-slate-100 text-slate-600">{s.status}</span></span>
+              <span><strong>{s.project_id}</strong> · by {s.user_id} · {s.created_at} · <span className="badge bg-elevated text-muted">{s.status}</span></span>
               <span className="flex gap-2">
                 <button className="btn-primary" onClick={() => review(s.id, 'approved')}>Approve</button>
                 <button className="btn-secondary" onClick={() => review(s.id, 'needs-changes')}>Request changes</button>
@@ -266,7 +268,7 @@ export function AdminAuditPage() {
   }, [action]);
   return (
     <Page title="Audit Logs" subtitle="Sensitive actions with actor, action, timestamp, target and result.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <input className="input mb-4 max-w-sm" placeholder="Filter by action (e.g. auth.login_failed)" value={action} onChange={(e) => setAction(e.target.value)} />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
@@ -283,7 +285,7 @@ export function AdminAuditPage() {
             ))}
           </tbody>
         </table>
-        {logs.length === 0 && <p className="p-4 text-slate-500">No audit entries match.</p>}
+        {logs.length === 0 && <p className="p-4 text-muted">No audit entries match.</p>}
       </div>
     </Page>
   );
@@ -308,7 +310,7 @@ export function AdminSettingsPage() {
   };
   return (
     <Page title="System Settings" subtitle="Runtime configuration. Changes are audit-logged.">
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <form onSubmit={save} className="card space-y-3 p-4">
         {Object.entries(config).map(([k, v]) => (
           <div key={k}>
@@ -318,6 +320,85 @@ export function AdminSettingsPage() {
         ))}
         <button className="btn-primary" type="submit">Save settings</button>
       </form>
+    </Page>
+  );
+}
+
+export function AdminRuntimesPage() {
+  const [runtimes, setRuntimes] = useState<RuntimeInfo[]>([]);
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const toast = useToast();
+  const load = useCallback(() => {
+    fetchRuntimes().then((d) => setRuntimes(d.runtimes)).catch((e) => setError(e.message));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const anyInstalling = runtimes.some((r) => r.provisioning?.state === 'installing');
+  useEffect(() => {
+    if (!anyInstalling) return;
+    const t = window.setInterval(load, 5000);
+    return () => window.clearInterval(t);
+  }, [anyInstalling, load]);
+  const install = async (rt: RuntimeInfo) => {
+    setBusyId(rt.id);
+    try {
+      await installRuntime(rt.id);
+      toast(`Installing ${rt.name} in the background.`, 'info');
+      load();
+    } catch (e) { toast((e as Error).message, 'error'); }
+    finally { setBusyId(null); }
+  };
+  return (
+    <Page title="Runtimes & Provisioning" subtitle="Every language the catalogue needs, and how it gets onto this machine. Baked-in runtimes ship in the Docker image; auto-installable ones are fetched in the background when a learner starts a course; manual ones need the steps shown.">
+      {error && <p role="alert" className="text-danger">{error}</p>}
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line text-left text-muted">
+              <th className="px-3 py-2">Runtime</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Provisioning</th>
+              <th className="px-3 py-2">Source</th>
+              <th className="px-3 py-2">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runtimes.map((rt) => {
+              const st = provisioningStatusText(rt);
+              return (
+                <tr key={rt.id} className="border-b border-line align-top last:border-0">
+                  <td className="px-3 py-2">
+                    <strong>{rt.name}</strong>
+                    <div className="text-xs text-muted">{rt.id}{rt.version ? ` · ${rt.version}` : ''}</div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`badge ${st.tone === 'ok' ? 'bg-success-soft text-success' : st.tone === 'busy' || st.tone === 'warn' ? 'bg-warning-soft text-warning' : st.tone === 'muted' ? 'bg-elevated text-muted' : 'bg-danger-soft text-danger'}`}>{st.text}</span>
+                    {rt.provisioning?.reason && <div className="mt-1 text-xs text-muted">{rt.provisioning.reason}</div>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="text-xs">{rt.provisioning?.state ?? 'unknown'}</span>
+                    {rt.provisioning?.guidance && <div className="mt-1 max-w-md text-xs text-muted">{rt.provisioning.guidance}</div>}
+                    {!rt.provisioning?.guidance && !rt.available && <div className="mt-1 max-w-md text-xs text-muted">{rt.installHint}</div>}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {rt.provisioning ? kindLabel(rt.provisioning.kind) : '—'}
+                    {rt.provisioning?.dockerBaked && <div className="text-muted">in Docker image</div>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {canInstall(rt) && (
+                      <button className="btn-secondary px-2 py-1 text-xs" onClick={() => install(rt)} disabled={busyId === rt.id}>
+                        {busyId === rt.id ? 'Starting…' : `Install ${rt.name}`}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {runtimes.length === 0 && !error && <p className="p-4 text-sm text-muted">Loading runtimes…</p>}
+      </div>
+      <button className="btn-secondary mt-3" onClick={load}>Refresh</button>
     </Page>
   );
 }

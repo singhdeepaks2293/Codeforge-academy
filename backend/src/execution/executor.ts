@@ -396,6 +396,5 @@ function unavailable(id: string): RunResult {
     success: false, stdout: '', stderr: '',
     exitCode: null, timedOut: false, durationMs: 0,
     runtimeUnavailable: true,
-    error: `Runtime '${id}' is not installed on this host. See GET /api/runtimes for install instructions.`,
-  };
+    error: `Runtime '${id}' is not installed on this host. See GET /api/runtimes for install instructions.`,  };
 }

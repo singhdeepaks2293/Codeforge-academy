@@ -38,7 +38,7 @@ function Controls({ idx, setIdx, playing, setPlaying, total, speed, setSpeed, on
           <option value={250}>Fast</option>
         </select>
       </label>
-      <span className="text-sm text-slate-500">Step {idx + 1} / {total}</span>
+      <span className="text-sm text-muted">Step {idx + 1} / {total}</span>
     </div>
   );
 }
@@ -50,7 +50,7 @@ function BarArray({ arr, highlight, done }: { arr: number[]; highlight?: number[
       {arr.map((v, i) => (
         <div key={i} className="flex-1 rounded-t" style={{
           height: `${(v / max) * 100}%`,
-          background: done?.includes(i) ? '#16a34a' : highlight?.includes(i) ? '#f97316' : '#334155',
+          background: done?.includes(i) ? 'rgb(var(--success))' : highlight?.includes(i) ? 'rgb(var(--brand))' : 'rgb(var(--muted) / 0.35)',
         }} title={String(v)} />
       ))}
     </div>
@@ -174,14 +174,14 @@ export function Visualization({ kind }: VizProps) {
           )}
           {kind === 'binary-search' && (
             <>
-              <p className="text-sm text-slate-500">Searching for 27 in the sorted array.</p>
+              <p className="text-sm text-muted">Searching for 27 in the sorted array.</p>
               <div className="mt-3 flex gap-1">
                 {[...arr].sort((a, b) => a - b).map((v, i) => {
                   const f = bsFrames[Math.min(idx, bsFrames.length - 1)];
                   const active = i >= f.lo && i <= f.hi;
                   const isMid = i === f.mid;
                   return (
-                    <div key={i} className={`flex h-12 w-12 items-center justify-center rounded font-mono font-bold ${isMid ? 'bg-brand-600 text-white' : active ? 'bg-slate-700 text-white dark:bg-slate-600' : 'bg-slate-200 text-slate-400 dark:bg-navy-800'}`}>{v}</div>
+                    <div key={i} className={`flex h-12 w-12 items-center justify-center rounded font-mono font-bold ${isMid ? 'bg-accent-500 text-white' : active ? 'bg-elevated text-ink' : 'bg-line text-faint'}`}>{v}</div>
                   );
                 })}
               </div>
@@ -193,9 +193,9 @@ export function Visualization({ kind }: VizProps) {
             <>
               <div className="flex flex-col-reverse gap-1">
                 {stack.map((v, i) => (
-                  <div key={i} className={`rounded px-3 py-2 text-center font-mono font-bold ${i === stack.length - 1 ? 'bg-brand-600 text-white' : 'bg-slate-700 text-white dark:bg-slate-600'}`}>{v}{i === stack.length - 1 ? ' ← top' : ''}</div>
+                  <div key={i} className={`rounded px-3 py-2 text-center font-mono font-bold ${i === stack.length - 1 ? 'bg-accent-500 text-white' : 'bg-elevated text-ink'}`}>{v}{i === stack.length - 1 ? ' ← top' : ''}</div>
                 ))}
-                {stack.length === 0 && <p className="text-sm text-slate-500">Stack is empty.</p>}
+                {stack.length === 0 && <p className="text-sm text-muted">Stack is empty.</p>}
               </div>
               <div className="mt-3 flex gap-2">
                 <button className="btn-primary" onClick={() => setStack([...stack, Math.floor(Math.random() * 90) + 10])}>Push</button>
@@ -208,9 +208,9 @@ export function Visualization({ kind }: VizProps) {
             <>
               <div className="flex gap-1">
                 {queue.map((v, i) => (
-                  <div key={i} className={`rounded px-3 py-2 font-mono font-bold ${i === 0 ? 'bg-brand-600 text-white' : 'bg-slate-700 text-white dark:bg-slate-600'}`}>{v}{i === 0 ? ' ← front' : ''}</div>
+                  <div key={i} className={`rounded px-3 py-2 font-mono font-bold ${i === 0 ? 'bg-accent-500 text-white' : 'bg-elevated text-ink'}`}>{v}{i === 0 ? ' ← front' : ''}</div>
                 ))}
-                {queue.length === 0 && <p className="text-sm text-slate-500">Queue is empty.</p>}
+                {queue.length === 0 && <p className="text-sm text-muted">Queue is empty.</p>}
               </div>
               <div className="mt-3 flex gap-2">
                 <button className="btn-primary" onClick={() => setQueue([...queue, Math.floor(Math.random() * 90) + 10])}>Enqueue</button>
@@ -224,14 +224,14 @@ export function Visualization({ kind }: VizProps) {
               <p className="text-sm">In-order traversal (always sorted): <strong className="font-mono">{[...bstKeys].sort((a, b) => a - b).join(', ')}</strong></p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {bstKeys.map((v) => (
-                  <span key={v} className="rounded-full bg-slate-700 px-3 py-1 font-mono text-sm text-white dark:bg-slate-600">{v}</span>
+                  <span key={v} className="rounded-full bg-elevated px-3 py-1 font-mono text-sm text-ink">{v}</span>
                 ))}
               </div>
               <div className="mt-3 flex gap-2">
                 <button className="btn-primary" onClick={() => { const v = Math.floor(Math.random() * 90) + 5; if (!bstKeys.includes(v)) setBstKeys([...bstKeys, v]); }}>Insert random key</button>
                 <button className="btn-secondary" onClick={() => setBstKeys([50, 30, 70, 20, 40, 60, 80])}>Reset</button>
               </div>
-              <p className="mt-2 text-sm text-slate-500">Keys smaller than a node go left, larger go right — so search, insert and delete all run in O(log n) on a balanced tree.</p>
+              <p className="mt-2 text-sm text-muted">Keys smaller than a node go left, larger go right — so search, insert and delete all run in O(log n) on a balanced tree.</p>
             </>
           )}
           {kind === 'graph-bfs' && (
@@ -239,7 +239,7 @@ export function Visualization({ kind }: VizProps) {
               <p className="text-sm">BFS order from node 0: <strong className="font-mono">{bfsOrder.slice(0, bfsStep + 1).join(' → ')}</strong></p>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {[0, 1, 2, 3, 4, 5].map((v) => (
-                  <div key={v} className={`rounded-lg px-3 py-2 text-center font-mono font-bold ${bfsOrder.slice(0, bfsStep + 1).includes(v) ? 'bg-brand-600 text-white' : 'bg-slate-200 dark:bg-navy-800'}`}>Node {v}<div className="text-xs font-normal">→ {(graphEdges[v] || []).join(', ')}</div></div>
+                  <div key={v} className={`rounded-lg px-3 py-2 text-center font-mono font-bold ${bfsOrder.slice(0, bfsStep + 1).includes(v) ? 'bg-accent-500 text-white' : 'bg-line'}`}>Node {v}<div className="text-xs font-normal">→ {(graphEdges[v] || []).join(', ')}</div></div>
                 ))}
               </div>
               <div className="mt-3 flex gap-2">
@@ -254,7 +254,7 @@ export function Visualization({ kind }: VizProps) {
               <input type="range" min={2} max={12} value={fibN} onChange={(e) => setFibN(Number(e.target.value))} className="w-full" />
               <div className="mt-2 flex flex-wrap gap-1">
                 {fibTable.map((v, i) => (
-                  <div key={i} className="rounded bg-slate-700 px-2 py-1 text-center font-mono text-xs text-white dark:bg-slate-600">dp[{i}]<br /><strong>{v}</strong></div>
+                  <div key={i} className="rounded bg-elevated px-2 py-1 text-center font-mono text-xs text-ink">dp[{i}]<br /><strong>{v}</strong></div>
                 ))}
               </div>
               <p className="mt-2 text-sm">Each cell is built from the two before it — memoization turns exponential recursion into O(n) time.</p>
@@ -263,9 +263,9 @@ export function Visualization({ kind }: VizProps) {
         </div>
         <div>
           <h4 className="font-semibold">Pseudocode</h4>
-          <pre className="mt-2 overflow-auto rounded-lg bg-navy-950 p-3 text-xs text-green-300">{PSEUDO[kind] || 'See the lesson for pseudocode.'}</pre>
+          <pre className="mt-2 overflow-auto rounded-lg bg-code p-3 text-xs text-success">{PSEUDO[kind] || 'See the lesson for pseudocode.'}</pre>
           <h4 className="mt-4 font-semibold">How to read this</h4>
-          <p className="mt-1 text-sm text-slate-500">Orange marks the elements being compared or moved; green marks finished positions. Step through slowly the first time, then replay at full speed.</p>
+          <p className="mt-1 text-sm text-muted">Orange marks the elements being compared or moved; green marks finished positions. Step through slowly the first time, then replay at full speed.</p>
         </div>
       </div>
     </div>
