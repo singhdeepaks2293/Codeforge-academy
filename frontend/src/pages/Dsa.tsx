@@ -60,6 +60,25 @@ const VIZ_KINDS = ['merge-sort', 'binary-search', 'stack', 'graph-bfs', 'bst', '
 
 const LANG_EXT: Record<string, string> = { python: 'py', javascript: 'js', typescript: 'ts', java: 'java', cpp: 'cpp', c: 'c', rust: 'rs', go: 'go' };
 
+// The eight languages every DSA problem offers, in selector order, with
+// the display label for each id. The selector always lists all eight —
+// never only the languages a problem happens to ship starter code for —
+// so a missing starter is a visible gap, not a missing option.
+export const DSA_LANGUAGES: { id: string; label: string }[] = [
+  { id: 'c', label: 'C' },
+  { id: 'cpp', label: 'C++' },
+  { id: 'java', label: 'Java' },
+  { id: 'go', label: 'Go' },
+  { id: 'rust', label: 'Rust' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'python', label: 'Python' },
+  { id: 'javascript', label: 'JavaScript' },
+];
+
+export function dsaLanguageLabel(id: string): string {
+  return DSA_LANGUAGES.find((l) => l.id === id)?.label || id;
+}
+
 export function DsaListPage() {
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [gate, setGate] = useState<{ dsaUnlocked: boolean; reason: string } | null>(null);
@@ -154,6 +173,11 @@ export function DsaProblemPage() {
   const [error, setError] = useState('');
   const [lang, setLang] = useState('');
   const [code, setCode] = useState('');
+  // Code per language, kept while the user stays on this problem: switching
+  // languages saves the current buffer and restores the other language's
+  // buffer (or its starter, first time). Nothing typed is ever discarded
+  // by a language switch; only Reset restores a starter.
+  const [codeByLang, setCodeByLang] = useState<Record<string, string>>({});
   const [output, setOutput] = useState('');
   const [results, setResults] = useState<{ name: string; passed: boolean; stdout?: string; stderr?: string; hidden?: boolean }[]>([]);
   const [hintLevel, setHintLevel] = useState(0);
@@ -167,6 +191,7 @@ export function DsaProblemPage() {
       .then((d) => {
         const p = normalizeProblem(d.problem);
         setProblem(p);
+        setCodeByLang({ ...p.starterCode });
         // Preselect a real language: prefer Python, otherwise the first
         // language the problem actually ships starter code for. The
         // dropdown must never render empty.
@@ -182,8 +207,35 @@ export function DsaProblemPage() {
   if (!problem) return <Page title="Problem"><p>Loading problem…</p></Page>;
 
   const langs = Object.keys(problem.starterCode);
+  // The selector always offers all eight languages (plus, defensively,
+  // any extra id the API ships that is not in the canonical eight).
+  const selectorLanguages = [
+    ...DSA_LANGUAGES,
+    ...langs.filter((l) => !DSA_LANGUAGES.some((d) => d.id === l)).map((l) => ({ id: l, label: l })),
+  ];
+  // A language only has an editor when the problem ships a starter for
+  // it; otherwise the honest empty state below is shown instead of a
+  // blank editor pretending the language is ready.
+  const hasStarterForLang = lang !== '' && Object.prototype.hasOwnProperty.call(problem.starterCode, lang);
   const vizKind = problem.topics.map((t) => VIZ_BY_TOPIC[t]).find(Boolean);
   const passedCount = results.filter((r) => r.passed).length;
+
+  const changeLang = (next: string) => {
+    setCodeByLang((prev) => ({ ...prev, [lang]: code }));
+    setLang(next);
+    setCode(codeByLang[next] ?? problem.starterCode[next] ?? '');
+  };
+
+  const handleCodeChange = (v: string) => {
+    setCode(v);
+    setCodeByLang((prev) => ({ ...prev, [lang]: v }));
+  };
+
+  const resetCode = () => {
+    const starter = problem.starterCode[lang] || '';
+    setCode(starter);
+    setCodeByLang((prev) => ({ ...prev, [lang]: starter }));
+  };
 
   const run = async () => {
     try {
@@ -295,15 +347,15 @@ export function DsaProblemPage() {
               id="dsa-lang"
               className="input !w-auto"
               value={lang}
-              onChange={(e) => { setLang(e.target.value); setCode(problem.starterCode[e.target.value] || ''); }}
+              onChange={(e) => changeLang(e.target.value)}
               disabled={langs.length === 0}
             >
-              {langs.map((l) => <option key={l} value={l}>{l}</option>)}
+              {selectorLanguages.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
             <div className="ml-auto flex flex-wrap gap-2">
-              <button className="btn-primary" onClick={run} disabled={!lang}>▶ Run</button>
-              <button className="btn-primary" onClick={submit} disabled={!lang}>✓ Submit</button>
-              <button className="btn-secondary" onClick={() => setCode(problem.starterCode[lang] || '')} disabled={!lang}>Reset</button>
+              <button className="btn-primary" onClick={run} disabled={!lang || !hasStarterForLang}>▶ Run</button>
+              <button className="btn-primary" onClick={submit} disabled={!lang || !hasStarterForLang}>✓ Submit</button>
+              <button className="btn-secondary" onClick={resetCode} disabled={!lang || !hasStarterForLang}>Reset</button>
             </div>
           </div>
 
@@ -311,9 +363,13 @@ export function DsaProblemPage() {
             <div className="flex min-h-0 flex-1 items-center justify-center p-6">
               <p className="text-sm text-muted">No starter code is available for this problem — the problem data has no language to run.</p>
             </div>
+          ) : !hasStarterForLang ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+              <p className="text-sm text-muted">No starter code is available for {dsaLanguageLabel(lang)} on this problem — pick another language from the selector above.</p>
+            </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
-              <CodeEditor language={langToEditor(lang)} value={code} onChange={setCode} ariaLabel="DSA solution editor" />
+              <CodeEditor language={langToEditor(lang)} value={code} onChange={handleCodeChange} ariaLabel="DSA solution editor" />
             </div>
           )}
 

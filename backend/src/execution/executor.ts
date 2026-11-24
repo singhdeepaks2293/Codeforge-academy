@@ -127,6 +127,14 @@ function scrubbedEnv(cwd: string): NodeJS.ProcessEnv {
     // explicitly so `rustc` (rustup shim) keeps working with a scrubbed HOME.
     RUSTUP_HOME: process.env.RUSTUP_HOME || join(realHome, '.rustup'),
     CARGO_HOME: process.env.CARGO_HOME || join(realHome, '.cargo'),
+    // Go's build cache also defaults under $HOME/.cache — but HOME here is
+    // the throwaway workspace, so every `go run` would rebuild the whole
+    // standard library from scratch (slow, and it risks the run timeout on
+    // modest hardware). Point the cache at a stable dir under the real home
+    // instead. The cache is content-addressed, so one run's build cannot
+    // poison another's; learner code still cannot reach the real home
+    // because HOME itself stays scrubbed.
+    ...(realHome ? { GOCACHE: join(realHome, '.cache', 'codeforge-go-build') } : {}),
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
     NODE_ENV: 'production',

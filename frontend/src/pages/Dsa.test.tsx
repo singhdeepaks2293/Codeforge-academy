@@ -15,8 +15,14 @@ vi.mock('../lib/api', async (importOriginal) => {
 });
 
 vi.mock('../components/MonacoEditor', () => ({
-  CodeEditor: ({ value, ariaLabel }: { value: string; ariaLabel?: string }) => (
-    <div data-testid="code-editor" aria-label={ariaLabel}>{value}</div>
+  // Exposes the Monaco language as data-language and an editable textarea
+  // wired to onChange, so tests can assert the editor mode and simulate
+  // typing without a real Monaco instance.
+  CodeEditor: ({ value, language, onChange, ariaLabel }: { value: string; language: string; onChange?: (v: string) => void; ariaLabel?: string }) => (
+    <div data-testid="code-editor" data-language={language} aria-label={ariaLabel}>
+      {value}
+      <textarea data-testid="code-editor-input" aria-label="Edit solution code" value={value} onChange={(e) => onChange?.(e.target.value)} />
+    </div>
   ),
 }));
 
@@ -40,6 +46,24 @@ const twoSumRaw = {
   solution_discussion: 'Scanning once and looking up each complement in a hash map finds the pair in linear time.',
   time_complexity: 'O(n)',
   space_complexity: 'O(n)',
+};
+
+const ALL_LANG_IDS = ['c', 'cpp', 'java', 'go', 'rust', 'typescript', 'python', 'javascript'];
+const ALL_LANG_LABELS = ['C', 'C++', 'Java', 'Go', 'Rust', 'TypeScript', 'Python', 'JavaScript'];
+
+// Same problem, but with a starter for every one of the eight languages.
+const twoSumAllLangs = {
+  ...twoSumRaw,
+  starter_code: {
+    c: '/* C_STARTER */\n',
+    cpp: '// CPP_STARTER\n',
+    java: '// JAVA_STARTER\n',
+    go: '// GO_STARTER\n',
+    rust: '// RUST_STARTER\n',
+    typescript: '// TYPESCRIPT_STARTER\n',
+    python: 'def solve(nums, target):\n    return [0, 1]\n',
+    javascript: 'function solve(nums, target) { return [0, 1]; }\n',
+  },
 };
 
 function renderList() {
@@ -179,5 +203,115 @@ describe('DsaProblemPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Constraints & complexity/ }));
     await screen.findByText('2 <= nums.length <= 10^4');
     expect(screen.queryByText(/Time:/)).not.toBeInTheDocument();
+  });
+
+  it('offers all eight languages even when the problem ships only two starters', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(ALL_LANG_IDS);
+    expect([...select.options].map((o) => o.textContent)).toEqual(ALL_LANG_LABELS);
+  });
+
+  it('shows an honest empty state, not a blank editor, for a language with no starter', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'rust' } });
+    expect(await screen.findByText(/No starter code is available for Rust on this problem/)).toBeInTheDocument();
+    expect(screen.queryByTestId('code-editor')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '▶ Run' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '✓ Submit' })).toBeDisabled();
+  });
+});
+
+describe('DsaProblemPage language selector (all 8 languages)', () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockApi.mockResolvedValue({ problem: twoSumAllLangs });
+  });
+
+  it('lists all eight languages with correct labels', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(ALL_LANG_IDS);
+    expect([...select.options].map((o) => o.textContent)).toEqual(ALL_LANG_LABELS);
+  });
+
+  it('loads the matching starter and Monaco language on select', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    expect(select.value).toBe('python');
+    fireEvent.change(select, { target: { value: 'rust' } });
+    const editor = screen.getByTestId('code-editor');
+    expect(editor).toHaveTextContent('RUST_STARTER');
+    expect(editor).toHaveAttribute('data-language', 'rust');
+    expect(screen.getByText('▤ solution.rs')).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'cpp' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('CPP_STARTER');
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-language', 'cpp');
+    expect(screen.getByText('▤ solution.cpp')).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'typescript' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('TYPESCRIPT_STARTER');
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-language', 'typescript');
+    expect(screen.getByText('▤ solution.ts')).toBeInTheDocument();
+  });
+
+  it('preserves typed code per language across switches', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    const input = screen.getByTestId('code-editor-input') as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: '# my python edit' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('# my python edit');
+    fireEvent.change(select, { target: { value: 'go' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('GO_STARTER');
+    fireEvent.change(select, { target: { value: 'python' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('# my python edit');
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-language', 'python');
+  });
+
+  it('Reset restores only the current language starter, keeping other languages intact', async () => {
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    const input = screen.getByTestId('code-editor-input') as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: '# my python edit' } });
+    fireEvent.change(select, { target: { value: 'java' } });
+    fireEvent.change(screen.getByTestId('code-editor-input'), { target: { value: '// my java edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('JAVA_STARTER');
+    fireEvent.change(select, { target: { value: 'python' } });
+    expect(screen.getByTestId('code-editor')).toHaveTextContent('# my python edit');
+  });
+
+  it('sends the selected language with the run request', async () => {
+    mockApi.mockImplementation(async (path: string) => {
+      if (path === '/api/execute/run') return { success: true, stdout: '0 1\n', stderr: '', exitCode: 0, timedOut: false };
+      return { problem: twoSumAllLangs };
+    });
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'rust' } });
+    fireEvent.click(screen.getByRole('button', { name: '▶ Run' }));
+    await screen.findByText(/exit 0/);
+    const runCall = mockApi.mock.calls.find((c) => c[0] === '/api/execute/run');
+    expect(runCall).toBeDefined();
+    const body = JSON.parse((runCall as unknown as [string, { body: string }])[1].body as string);
+    expect(body.language).toBe('rust');
+    expect(body.code).toContain('RUST_STARTER');
+  });
+
+  it('sends the selected language with the submit request', async () => {
+    mockApi.mockImplementation(async (path: string) => {
+      if (path.endsWith('/submit')) return { passed: true, results: [{ name: 'basic', passed: true, hidden: false }] };
+      return { problem: twoSumAllLangs };
+    });
+    renderProblem();
+    const select = await screen.findByLabelText('Language') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'java' } });
+    fireEvent.click(screen.getByRole('button', { name: '✓ Submit' }));
+    await screen.findByText(/Tests \(1\/1\)/);
+    const submitCall = mockApi.mock.calls.find((c) => typeof c[0] === 'string' && (c[0] as string).endsWith('/submit'));
+    expect(submitCall).toBeDefined();
+    const body = JSON.parse((submitCall as unknown as [string, { body: string }])[1].body as string);
+    expect(body.language).toBe('java');
+    expect(body.code).toContain('JAVA_STARTER');
   });
 });

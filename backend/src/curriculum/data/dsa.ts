@@ -1,4 +1,10 @@
 import type { DsaProblem } from '../types.js';
+import { DSA_STARTERS_C } from './dsa-starters-c.js';
+import { DSA_STARTERS_CPP } from './dsa-starters-cpp.js';
+import { DSA_STARTERS_JAVA } from './dsa-starters-java.js';
+import { DSA_STARTERS_GO } from './dsa-starters-go.js';
+import { DSA_STARTERS_RUST } from './dsa-starters-rust.js';
+import { DSA_STARTERS_TYPESCRIPT } from './dsa-starters-typescript.js';
 
 export const DSA_PROBLEMS: DsaProblem[] = [
   {
@@ -13533,3 +13539,24 @@ export const DSA_PROBLEMS: DsaProblem[] = [
     "spaceComplexity": "O(n)"
   }
 ];
+
+// Merge the six additional language starters (C, C++, Java, Go, Rust,
+// TypeScript) into every problem. Python and JavaScript ship inline above;
+// the other languages live in dsa-starters-<lang>.ts to keep this file
+// manageable. Every problem must end up with all 8 languages; a missing
+// entry is left out (the frontend shows an honest empty state for it) and
+// scripts/check-dsa-starters.mjs fails the build if any is missing.
+const DSA_EXTRA_STARTERS: Record<string, Record<string, string>> = {
+  c: DSA_STARTERS_C,
+  cpp: DSA_STARTERS_CPP,
+  java: DSA_STARTERS_JAVA,
+  go: DSA_STARTERS_GO,
+  rust: DSA_STARTERS_RUST,
+  typescript: DSA_STARTERS_TYPESCRIPT,
+};
+for (const p of DSA_PROBLEMS) {
+  for (const [lang, starters] of Object.entries(DSA_EXTRA_STARTERS)) {
+    const code = starters[p.id];
+    if (typeof code === 'string' && code.length > 0) p.starterCode[lang] = code;
+  }
+}
