@@ -37,30 +37,69 @@ describe('Layout sidebar', () => {
     document.documentElement.classList.remove('dark');
   });
 
-  it('starts expanded (~210px) with no saved preference', () => {
+  it('starts collapsed to the ~68px icon rail with no saved preference', () => {
     renderLayout();
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '210px' });
-    expect(screen.getByText('Explore Courses')).toBeInTheDocument();
-  });
-
-  it('collapses to ~68px icons-only and persists the preference', () => {
-    renderLayout();
-    fireEvent.click(screen.getByLabelText('Collapse sidebar'));
-    const aside = screen.getByLabelText('Main navigation');
-    expect(aside).toHaveStyle({ width: '68px' });
-    expect(localStorage.getItem('cf-sidebar-collapsed')).toBe('1');
-    // Labels are hidden when collapsed; the icon link still carries a tooltip.
+    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '68px' });
     expect(screen.queryByText('Explore Courses')).not.toBeInTheDocument();
     expect(screen.getByTitle('Explore Courses')).toBeInTheDocument();
   });
 
-  it('restores a persisted collapsed sidebar on load', () => {
-    localStorage.setItem('cf-sidebar-collapsed', '1');
+  it('expands to ~210px labelled and persists the preference', () => {
     renderLayout();
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '68px' });
     fireEvent.click(screen.getByLabelText('Expand sidebar'));
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '210px' });
+    const aside = screen.getByLabelText('Main navigation');
+    expect(aside).toHaveStyle({ width: '210px' });
     expect(localStorage.getItem('cf-sidebar-collapsed')).toBe('0');
+    expect(screen.getByText('Explore Courses')).toBeInTheDocument();
+  });
+
+  it('restores a persisted expanded sidebar on load', () => {
+    localStorage.setItem('cf-sidebar-collapsed', '0');
+    renderLayout();
+    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '210px' });
+    fireEvent.click(screen.getByLabelText('Collapse sidebar'));
+    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '68px' });
+    expect(localStorage.getItem('cf-sidebar-collapsed')).toBe('1');
+  });
+});
+
+describe('Layout viewport-fit shell', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+  });
+
+  it('is exactly viewport height and never scrolls at page level', () => {
+    const { container } = renderLayout();
+    const shell = container.firstChild as HTMLElement;
+    expect(shell.className).toContain('h-dvh');
+    expect(shell.className).toContain('overflow-hidden');
+  });
+
+  it('gives the main content its own scroll panel', () => {
+    const { container } = renderLayout();
+    const main = container.querySelector('main') as HTMLElement;
+    expect(main.className).toContain('panel-scroll');
+    expect(main.className).toContain('min-h-0');
+  });
+
+  it('resets the sidebar scroll position on navigation', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <ToastProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<div>Dashboard content</div>} />
+              <Route path="profile" element={<div>Profile content</div>} />
+            </Route>
+          </Routes>
+        </ToastProvider>
+      </MemoryRouter>,
+    );
+    const nav = container.querySelector('nav') as HTMLElement;
+    nav.scrollTop = 120;
+    fireEvent.click(screen.getByTitle('Profile'));
+    expect(nav.scrollTop).toBe(0);
   });
 });
 

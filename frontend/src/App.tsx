@@ -10,7 +10,7 @@ import { CoursesPage, CourseDetailPage, MyLearningPage, PathsPage } from './page
 import { LessonWorkspacePage } from './pages/LessonWorkspace';
 import { DsaListPage, DsaProblemPage } from './pages/Dsa';
 import { ProjectsPage, ProjectDetailPage } from './pages/Projects';
-import { AssessmentPage } from './pages/Assessment';
+import { AssessmentPage, AssessmentsListPage } from './pages/Assessment';
 import { AchievementsPage, ProgressPage, ProfilePage, SettingsPage } from './pages/LearnPages';
 import { AdminDashboardPage, AdminUsersPage, AdminRolesPage, AdminCurriculumPage, AdminSubmissionsPage, AdminAuditPage, AdminSettingsPage, AdminRuntimesPage } from './pages/Admin';
 import type { ReactElement } from 'react';
@@ -53,6 +53,7 @@ export default function App() {
               <Route path="/practice/:slug" element={<DsaProblemPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:slug" element={<ProjectDetailPage />} />
+              <Route path="/assessments" element={<AssessmentsListPage />} />
               <Route path="/assessments/:courseSlug" element={<AssessmentPage />} />
               <Route path="/achievements" element={<AchievementsPage />} />
               <Route path="/progress" element={<ProgressPage />} />

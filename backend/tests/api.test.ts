@@ -66,7 +66,9 @@ beforeAll(async () => {
   const { openDb, seedRolesAndPermissions } = await import('../src/db/db.js');
   openDb(process.env.DATABASE_PATH);
   seedRolesAndPermissions(openDb(process.env.DATABASE_PATH));
-  // Seed the full catalog (100 tracks) — main() does not run under NODE_ENV=test.
+  // Seed the full catalog (793 tracks at phase-2 totals) — main() does not
+  // run under NODE_ENV=test. The seed is ~40s for ~600 courses on this slow
+  // sandbox (per-row upserts), so the hook timeout must cover it.
   const { seedCurriculum } = await import('../src/db/seed.js');
   const counts = await seedCurriculum(openDb(process.env.DATABASE_PATH));
   console.log('[test seed]', JSON.stringify(counts));
@@ -75,7 +77,7 @@ beforeAll(async () => {
   const addr = server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
   base = `http://127.0.0.1:${port}`;
-}, 30000);
+}, 120000);
 
 afterAll(() => {
   server?.close();
@@ -217,19 +219,29 @@ describe('code execution (real)', () => {
   });
 });
 
-describe('100-track catalog + new executors', () => {
-  it('catalog has 100 courses and 1354 lessons across 7 categories', async () => {
+describe('700-track catalog + new executors', () => {
+  it('catalog has 793 courses and 8284 lessons across 7 categories', async () => {
     const { res, json } = await req('/api/courses');
     expect(res.status).toBe(200);
-    const courses = json?.courses as { slug: string; totalLessons: number; category?: string }[];
-    expect(courses.length).toBe(100);
-    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(1354);
+    const courses = json?.courses as { slug: string; totalLessons: number; category?: string; language?: string }[];
+    expect(courses.length).toBe(793);
+    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(8284);
     const cats = new Set(courses.map((c) => c.category));
     expect([...cats].sort()).toEqual(['cs-career', 'data-ai', 'databases', 'devops', 'languages', 'mobile', 'web']);
     const dataAi = await req('/api/courses?category=data-ai');
     const dataCourses = (dataAi.json?.courses || []) as { category?: string }[];
-    expect(dataCourses.length).toBe(16);
+    expect(dataCourses.length).toBe(31); // 16 existing + 15 new ML/neural tracks
     expect(dataCourses.every((c) => c.category === 'data-ai')).toBe(true);
+    const devops = await req('/api/courses?category=devops');
+    const devopsCourses = (devops.json?.courses || []) as { category?: string; language?: string }[];
+    expect(devopsCourses.length).toBe(54); // 14 existing + 40 new DevOps tool tracks
+    expect(devopsCourses.every((c) => c.category === 'devops')).toBe(true);
+    for (const tool of ['ansible', 'terraform', 'docker', 'git']) {
+      expect(devopsCourses.filter((c) => c.language === tool).length).toBe(10);
+    }
+    for (const lang of ['c', 'cpp', 'python', 'typescript', 'react', 'rust', 'go']) {
+      expect(courses.filter((c) => c.language === lang).length).toBe(100);
+    }
     const py = courses.find((c) => c.slug === 'python');
     expect(py?.totalLessons).toBe(54); // v1 track untouched
   });
@@ -307,6 +319,62 @@ describe('100-track catalog + new executors', () => {
       expect(r.json?.runtimeUnavailable).toBe(true);
     }
   });
+
+  it('runs Git exercises for real in a fresh repo (fast commands must not crash the runner)', async () => {
+    // Regression: `git init`/`git config` exit in milliseconds, before the
+    // runner's stdin write lands — before the stdin-EPIPE guard this
+    // crashed the backend process with an unhandled socket error.
+    const r = await authed('/api/execute/run', studentCookie, 'POST', {
+      language: 'git',
+      code: 'echo hello > note.txt\ngit add note.txt\ngit commit -qm "first commit"\ngit log --oneline\n',
+    });
+    expect(r.res.status).toBe(200);
+    expect(r.json?.success).toBe(true);
+    expect(String(r.json?.stdout)).toContain('first commit');
+  });
+
+  it('runs Terraform validate for real when installed, else 503s honestly', async () => {
+    const { json } = await authed('/api/execute/runtimes', studentCookie);
+    const tf = (json?.runtimes as { id: string; available: boolean }[]).find((x) => x.id === 'terraform');
+    expect(tf).toBeDefined();
+    const r = await authed('/api/execute/run', studentCookie, 'POST', {
+      language: 'terraform',
+      code: 'variable "name" {\n  type = string\n  default = "web"\n}\n\noutput "greeting" {\n  value = "hello-${var.name}"\n}\n',
+    });
+    if (tf?.available) {
+      expect(r.res.status).toBe(200);
+      expect(String(r.json?.stdout)).toContain('Success! The configuration is valid.');
+    } else {
+      expect(r.res.status).toBe(503);
+      expect(r.json?.runtimeUnavailable).toBe(true);
+    }
+  });
+
+  it('ansible and docker report honestly when their CLI/daemon is missing', async () => {
+    const { json } = await authed('/api/execute/runtimes', studentCookie);
+    const runtimes = json?.runtimes as { id: string; available: boolean }[];
+    for (const [lang, code] of [
+      ['ansible', '- name: t\n  hosts: localhost\n  gather_facts: false\n  tasks:\n    - debug:\n        msg: hello ansible\n'],
+      ['docker', 'FROM alpine\nRUN echo hello-docker\n'],
+    ] as const) {
+      const info = runtimes.find((x) => x.id === lang);
+      expect(info).toBeDefined();
+      const r = await authed('/api/execute/run', studentCookie, 'POST', { language: lang, code });
+      if (!info?.available) {
+        expect(r.res.status).toBe(503);
+        expect(r.json?.runtimeUnavailable).toBe(true);
+      } else if (lang === 'docker') {
+        // CLI present but the daemon may still be unreachable: either a real
+        // build or an honest 503 — never a fake pass.
+        expect([200, 503]).toContain(r.res.status);
+        if (r.res.status === 200) expect(String(r.json?.stdout)).toContain('codeforge-test');
+        else expect(r.json?.runtimeUnavailable).toBe(true);
+      } else {
+        expect(r.res.status).toBe(200);
+        expect(String(r.json?.stdout)).toContain('hello ansible');
+      }
+    }
+  });
 });
 
 describe('progress + sessions', () => {
@@ -321,5 +389,37 @@ describe('progress + sessions', () => {
   it('password change requires the current password', async () => {
     const r = await authed('/api/auth/change-password', studentCookie, 'POST', { currentPassword: 'Nope1234', newPassword: 'NewPass123' });
     expect([401, 403]).toContain(r.res.status);
+  });
+});
+
+describe('DSA problem detail', () => {
+  it('returns camelCase fields (starterCode, time/spaceComplexity) so the editor loads with a language preselected', async () => {
+    // Fresh student: the shared studentCookie is revoked by the
+    // 'session revocation works' test above, and the student account is
+    // locked out for 15 min by the lockout test, so log in as a new user.
+    const reg = await req('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'dsa-student@local.test', password: 'DsaStudent1', displayName: 'DSA Learner' }),
+    });
+    expect(reg.res.status).toBe(201);
+    const cookie = jarHeader();
+    const { res, json } = await authed('/api/dsa/problems/two-sum', cookie);
+    expect(res.status).toBe(200);
+    const p = json?.problem as Record<string, unknown>;
+    expect(p).toBeDefined();
+    // camelCase contract — the raw DB row is snake_case; the route must map it.
+    expect(p.starterCode).toBeDefined();
+    expect(typeof p.starterCode).toBe('object');
+    expect(Object.keys(p.starterCode as object).length).toBeGreaterThan(0);
+    expect(typeof p.timeComplexity).toBe('string');
+    expect((p.timeComplexity as string).length).toBeGreaterThan(0);
+    expect(typeof p.spaceComplexity).toBe('string');
+    expect((p.spaceComplexity as string).length).toBeGreaterThan(0);
+    expect(p.solutionDiscussion).toBeDefined();
+    // no raw snake_case columns leak into the response
+    expect(p.starter_code).toBeUndefined();
+    expect(p.time_complexity).toBeUndefined();
+    expect(p.space_complexity).toBeUndefined();
+    expect(p.solution_discussion).toBeUndefined();
   });
 });

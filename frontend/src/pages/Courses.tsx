@@ -4,30 +4,13 @@ import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
+import { CATEGORIES, LANGUAGE_FILTER_OPTIONS, coursePill } from '../lib/courseTaxonomy';
 
 interface Course {
-  id: string; slug: string; language: string; title: string; description: string;
+  id: string; slug: string; language: string; category?: string; title: string; description: string;
   difficulty: string; estimated_hours: number; skills: string[]; prerequisites: string[];
   totalLessons: number; status: string;
 }
-
-const LANG_LABEL: Record<string, string> = {
-  c: 'C', cpp: 'C++', python: 'Python', typescript: 'TypeScript', react: 'React', rust: 'Rust', go: 'Go',
-  java: 'Java', javascript: 'JavaScript', csharp: 'C#', kotlin: 'Kotlin', swift: 'Swift', php: 'PHP',
-  ruby: 'Ruby', dart: 'Dart', scala: 'Scala', haskell: 'Haskell', elixir: 'Elixir', lua: 'Lua',
-  r: 'R', julia: 'Julia', perl: 'Perl', 'objective-c': 'Objective-C', asm: 'Assembly', solidity: 'Solidity',
-  sql: 'SQL', html: 'HTML & CSS', bash: 'Bash', mongodb: 'MongoDB', redis: 'Redis',
-};
-
-const CATEGORIES: { id: string; label: string }[] = [
-  { id: 'languages', label: 'Languages' },
-  { id: 'web', label: 'Web & Frontend' },
-  { id: 'mobile', label: 'Mobile' },
-  { id: 'data-ai', label: 'Data, AI & ML' },
-  { id: 'databases', label: 'Databases & Backend' },
-  { id: 'devops', label: 'DevOps, Cloud & Systems' },
-  { id: 'cs-career', label: 'CS Foundations & Career' },
-];
 
 export function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -46,7 +29,7 @@ export function CoursesPage() {
   const totalLessons = courses.reduce((n, c) => n + (c.totalLessons || 0), 0);
   const filtered = courses.filter((c) => {
     if (lang && c.language !== lang) return false;
-    if (category && (c as Course & { category?: string }).category !== category) return false;
+    if (category && c.category !== category) return false;
     if (q && !(c.title + c.description).toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
@@ -57,15 +40,20 @@ export function CoursesPage() {
         {courses.length} tracks · {totalLessons} lessons
       </p>
       {error && <p role="alert" className="text-danger">{error}</p>}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <input className="input max-w-sm" placeholder="Search courses…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search courses" />
-        <select className="input w-auto" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+      {/* One row on desktop, wrapping gracefully on narrow screens. NOTE: the
+          plain `w-auto` utility loses to `.input{width:100%}` in the built
+          CSS (component layer sorts after utilities), so the important
+          `!w-auto` is required here — without it each control goes full-width
+          and the row stacks. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input className="input min-w-0 flex-1 sm:max-w-sm" placeholder="Search courses…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search courses" />
+        <select className="input shrink-0 !w-auto" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
           <option value="">All categories</option>
           {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
-        <select className="input w-auto" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Filter by language">
+        <select className="input shrink-0 !w-auto" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Filter by language">
           <option value="">All languages</option>
-          {Object.entries(LANG_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {LANGUAGE_FILTER_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
       {filtered.length === 0 && <div className="card p-6 text-center text-muted">No courses match your filters.</div>}
@@ -73,7 +61,7 @@ export function CoursesPage() {
         {filtered.map((c) => (
           <article key={c.id} className="card flex flex-col p-5">
             <div className="flex items-center justify-between">
-              <span className="badge bg-accent-soft text-accent-600">{LANG_LABEL[c.language] || c.language}</span>
+              <span className="badge bg-accent-soft text-accent-600">{coursePill(c)}</span>
               <span className="text-xs text-muted">{c.estimated_hours}h · {c.totalLessons} lessons</span>
             </div>
             <h2 className="mt-3 text-lg font-bold">{c.title}</h2>
@@ -126,7 +114,7 @@ export function CourseDetailPage() {
   return (
     <Page title={detail.course.title} subtitle={detail.course.description}>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="badge bg-accent-soft text-accent-600">{LANG_LABEL[detail.course.language]}</span>
+        <span className="badge bg-accent-soft text-accent-600">{coursePill(detail.course)}</span>
         <span className="text-sm text-muted">{detail.course.estimated_hours} hours · {detail.modules.length} modules</span>
         {progress && <span className="text-sm font-semibold">{progress.completed}/{progress.total} lessons · {progress.percent}% complete</span>}
         {user && <button className="btn-primary" onClick={enroll}>Enroll</button>}

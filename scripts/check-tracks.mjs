@@ -5,12 +5,17 @@
 // >=2 tests (1 visible + 1 hidden) for code exercises, >=2 quiz questions,
 // unique lesson/exercise ids, concept-opening duplication, assessment shape.
 // Exit 0 only if everything passes.
+import { readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const dist = process.argv[2] || join(root, 'backend', 'dist');
+// --skip-totals: validate structure only (duplicates, hints, tests, openings)
+// without the final totals — for incremental work while tracks still land.
+const skipTotals = process.argv.includes('--skip-totals');
+const distArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const dist = distArg || join(root, 'backend', 'dist');
 let errors = 0, warnings = 0;
 function err(msg) { errors++; console.error(`  FAIL ${msg}`); }
 function warn(msg) { warnings++; console.log(`  WARN ${msg}`); }
@@ -39,6 +44,13 @@ const assessmentArrays = [
   ['curriculum/data/tracks-devops.js', 'SHORT_ASSESSMENTS_DEVOPS'],
   ['curriculum/data/tracks-cs.js', 'SHORT_ASSESSMENTS_CS'],
 ];
+// 700-track expansion: every tracks700-*.js exports TRACKS_700 + SHORT_ASSESSMENTS_700.
+const sevenHundred = readdirSync(join(dist, 'curriculum', 'data'))
+  .filter((f) => f.startsWith('tracks700-') && f.endsWith('.js')).sort();
+for (const f of sevenHundred) {
+  trackArrays.push([`curriculum/data/${f}`, 'TRACKS_700']);
+  assessmentArrays.push([`curriculum/data/${f}`, 'SHORT_ASSESSMENTS_700']);
+}
 
 async function load(rel, key) {
   try {
@@ -71,12 +83,16 @@ for (const [rel, key] of assessmentArrays) {
 }
 
 let lessons = 0, exercises = 0;
-const lessonIds = new Set(), exerciseIds = new Set(), courseSlugs = new Set();
+const lessonIds = new Set(), exerciseIds = new Set(), courseSlugs = new Set(), courseTitles = new Set();
+const perLang = {};
 const openings = new Map();
 const noTests = [], noHints = [], noQuiz = [];
 for (const c of courses) {
   if (courseSlugs.has(c.slug)) err(`duplicate course slug ${c.slug}`);
   courseSlugs.add(c.slug);
+  if (courseTitles.has(c.title)) err(`duplicate course title "${c.title}" (slug ${c.slug})`);
+  courseTitles.add(c.title);
+  perLang[c.language] = (perLang[c.language] || 0) + 1;
   if (!c.category && !['c','cpp','python','typescript','react','rust','go'].includes(c.id)) {
     // category lives on CourseSpec; buildCourse strips it — check via modules instead.
   }
@@ -127,8 +143,21 @@ else console.log('  PASS concept openings: most-repeated <= 2x');
 
 console.log(`\nCourses: ${courses.length}  Lessons: ${lessons}  Exercises: ${exercises}`);
 console.log(`Per new-track file: ${JSON.stringify(perFile)}`);
+console.log(`Per core language: ${JSON.stringify(perLang)}`);
 console.log(`Errors: ${errors}  Warnings: ${warnings}`);
-if (courses.length !== 100) err(`TOTAL courses ${courses.length} != 100`);
-if (lessons !== 1354) err(`TOTAL lessons ${lessons} != 1354`);
-if (exercises !== 1354) err(`TOTAL exercises ${exercises} != 1354`);
+if (!skipTotals) {
+  // Final totals: 100 existing tracks + 653 new language tracks (98 C,
+  // 99 C++, 62 Python, 97 TypeScript, 99 React, 99 Rust, 99 Go) + 40 new
+  // DevOps tool tracks (10 each Ansible/Terraform/Docker/Git) = 793
+  // courses; every new track has exactly 10 lessons
+  // => 1354 + 6530 + 400 = 8284 lessons/exercises.
+  if (courses.length !== 793) err(`TOTAL courses ${courses.length} != 793`);
+  if (lessons !== 8284) err(`TOTAL lessons ${lessons} != 8284`);
+  if (exercises !== 8284) err(`TOTAL exercises ${exercises} != 8284`);
+  for (const lang of ['c', 'cpp', 'python', 'typescript', 'react', 'rust', 'go']) {
+    if ((perLang[lang] || 0) !== 100) err(`language ${lang} has ${perLang[lang] || 0} tracks (need exactly 100)`);
+  }
+} else {
+  console.log('(totals skipped: --skip-totals)');
+}
 process.exit(errors ? 1 : 0);

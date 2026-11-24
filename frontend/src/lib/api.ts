@@ -41,6 +41,10 @@ export function langToEditor(lang: string): string {
     csharp: 'csharp', kotlin: 'kotlin', swift: 'swift', php: 'php', ruby: 'ruby',
     dart: 'dart', scala: 'scala', haskell: 'haskell', lua: 'lua', r: 'r',
     'objective-c': 'objective-c',
+    // DevOps tool tracks: ansible playbooks are YAML; Dockerfiles have a
+    // Monaco language; git exercises are shell scripts; Terraform's HCL
+    // has no Monaco language, so plaintext (honest, no fake highlighting).
+    ansible: 'yaml', docker: 'dockerfile', git: 'shell', terraform: 'plaintext',
   };
   return map[lang] || 'plaintext';
 }

@@ -33,11 +33,14 @@ export function DashboardPage() {
   const doneLessons = data.courses.reduce((s, c) => s + c.completed_lessons, 0);
   const pct = totalLessons ? Math.round((doneLessons / totalLessons) * 100) : 0;
   const maxXp = Math.max(...data.activity.map((a) => a.xp), 1);
+  const totalActivityXp = data.activity.reduce((s, a) => s + a.xp, 0);
+  const earnedAchievements = data.allAchievements.filter((a) => data.achievements.some((x) => x.id === a.id));
+  const unearnedAchievements = data.allAchievements.filter((a) => !data.achievements.some((x) => x.id === a.id));
 
   return (
     <Page title={`Welcome back, ${user?.displayName ?? 'learner'} 👋`} subtitle="Learn → Understand → Practice → Debug → Master → DSA → Build Projects → Become Industry Ready">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card p-4"><div className="text-sm text-muted">Total XP</div><div className="text-3xl font-bold text-accent-600">{data.xp}</div><div className="text-xs text-muted">Today: {data.todayXp} / {data.dailyGoal} daily goal</div>
+        <div className="card p-4"><div className="text-sm text-muted">Total XP</div><div data-testid="total-xp" className="text-4xl font-bold leading-tight text-accent-600">{(data.xp ?? 0).toLocaleString()} <span className="text-lg">XP</span></div><div className="text-xs text-muted">Today: {data.todayXp} / {data.dailyGoal} daily goal{data.xp === 0 ? ' — complete your first lesson to earn XP' : ''}</div>
           <div className="mt-2 h-2 rounded bg-line"><div className="h-2 rounded bg-accent-500" style={{ width: `${Math.min(100, (data.todayXp / data.dailyGoal) * 100)}%` }} /></div></div>
         <div className="card p-4"><div className="text-sm text-muted">Learning streak</div><div className="text-3xl font-bold">🔥 {data.streak} {data.streak === 1 ? 'day' : 'days'}</div><div className="text-xs text-muted">Keep it alive — learn a little every day</div></div>
         <div className="card p-4"><div className="text-sm text-muted">Completion</div><div className="text-3xl font-bold">{pct}%</div><div className="text-xs text-muted">{doneLessons} of {totalLessons} lessons completed</div>
@@ -45,7 +48,10 @@ export function DashboardPage() {
         <div className="card p-4"><div className="text-sm text-muted">DSA · Projects</div><div className="text-3xl font-bold">{data.dsa.solved} / {data.dsa.total}</div><div className="text-xs text-muted">Problems solved · {data.projectsCompleted} projects completed</div></div>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      {/* items-start: cards hug their content instead of stretching to the
+          tallest card in the row (which left gaping empty areas on a
+          0-progress account). */}
+      <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <div className="card p-4">
           <h2 className="text-lg font-bold">Continue learning</h2>
           {enrolled.length === 0 && <p className="mt-2 text-sm text-muted">You have not enrolled in a course yet.</p>}
@@ -62,41 +68,65 @@ export function DashboardPage() {
           <Link className="btn-secondary mt-4" to="/courses">Explore all courses</Link>
         </div>
 
-        <div className="card p-4">
+        {/* scroll-mt keeps the card clear of the sticky header on anchor
+            jumps; the chart's top padding keeps the tallest bar from
+            touching the card edge (it read as a line clipped under the
+            header). When there is no XP at all, show one compact line
+            instead of an empty bar grid. */}
+        <div className="card scroll-mt-24 p-4">
           <h2 className="text-lg font-bold">Last 14 days of activity</h2>
-          {data.activity.length === 0 && <p className="mt-2 text-sm text-muted">No activity yet — complete a lesson to start your chart.</p>}
-          <div className="mt-3 flex h-28 items-end gap-1">
-            {[...data.activity].reverse().map((a) => (
-              <div key={a.activity_date} className="flex-1 rounded-t bg-accent-500" style={{ height: `${Math.max(4, (a.xp / maxXp) * 100)}%` }} title={`${a.activity_date}: ${a.xp} XP, ${a.lessons_completed} lessons`} />
-            ))}
-          </div>
-          <div className="mt-1 flex justify-between text-xs text-muted"><span>14 days ago</span><span>today</span></div>
+          {totalActivityXp === 0
+            ? <p className="mt-2 text-sm text-muted">No activity yet — <Link className="font-semibold text-accent-600" to="/courses">complete a lesson</Link> to start your chart.</p>
+            : (
+              <>
+                <div className="mt-3 flex h-28 items-end gap-1 pt-2">
+                  {[...data.activity].reverse().map((a) => (
+                    <div key={a.activity_date} className="flex-1 rounded-t bg-accent-500" style={{ height: `${Math.max(4, (a.xp / maxXp) * 100)}%` }} title={`${a.activity_date}: ${a.xp} XP, ${a.lessons_completed} lessons`} />
+                  ))}
+                </div>
+                <div className="mt-1 flex justify-between text-xs text-muted"><span>14 days ago</span><span>today</span></div>
+              </>
+            )}
           <h3 className="mt-5 font-semibold">Recently completed lessons</h3>
           {data.recentLessons.length === 0 && <p className="text-sm text-muted">None yet.</p>}
           <ul className="mt-1 list-disc pl-5 text-sm">{data.recentLessons.map((l) => <li key={l.id}>{l.title}</li>)}</ul>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <div className="card p-4">
           <h2 className="text-lg font-bold">Achievements ({data.achievements.length} / {data.allAchievements.length})</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {data.allAchievements.map((a) => {
-              const earned = data.achievements.find((x) => x.id === a.id);
-              return (
-                <span key={a.id} title={earned ? `Earned ${earned.earned_at}` : a.description}
-                  className={`badge ${earned ? 'bg-warning-soft text-warning' : 'bg-elevated text-faint'}`}>
-                  {a.icon} {a.title}
-                </span>
-              );
-            })}
-          </div>
+          {earnedAchievements.length === 0 ? (
+            <p className="mt-2 text-sm text-muted">No achievements yet — complete your first lesson to earn your first badge.</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {earnedAchievements.map((a) => {
+                const earned = data.achievements.find((x) => x.id === a.id)!;
+                return (
+                  <span key={a.id} title={`Earned ${earned.earned_at} — ${a.description}`}
+                    className="badge bg-warning-soft text-warning">
+                    {a.icon} {a.title}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {unearnedAchievements.length > 0 && earnedAchievements.length > 0 && (
+            <details className="mt-3 text-sm">
+              <summary className="cursor-pointer font-semibold text-accent-600">Show {unearnedAchievements.length} unearned achievements</summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {unearnedAchievements.map((a) => (
+                  <span key={a.id} title={a.description} className="badge bg-elevated text-faint">{a.icon} {a.title}</span>
+                ))}
+              </div>
+            </details>
+          )}
           <Link className="btn-secondary mt-4" to="/achievements">View all achievements</Link>
         </div>
         <div className="card p-4">
           <h2 className="text-lg font-bold">Recommended for you</h2>
           {data.weakTopics.length === 0
-            ? <p className="mt-2 text-sm text-muted">No weak topics detected yet. Solve a few DSA problems and your recommendations will appear here, based on your real pass rates.</p>
+            ? <p className="mt-2 text-sm text-muted">No recommendations yet — solve a few DSA problems and this will fill in from your real pass rates.</p>
             : (
               <ul className="mt-2 space-y-2 text-sm">
                 {data.weakTopics.map((w) => (

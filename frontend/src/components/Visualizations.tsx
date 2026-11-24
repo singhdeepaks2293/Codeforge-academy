@@ -2,7 +2,12 @@
 // Each generates step frames; controls: play/pause/step/reset/speed, pseudocode beside.
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-export interface VizProps { kind: string; }
+export interface VizProps { kind: string; showHowToRead?: boolean; }
+
+// The legend is shared by every visualization; render it once per page
+// (the DSA list page does) instead of repeating it inside every card.
+export const HOW_TO_READ_TEXT =
+  'Orange marks the elements being compared or moved; green marks finished positions. Step through slowly the first time, then replay at full speed.';
 
 function usePlayer(frames: unknown[], speedMs: number) {
   const [idx, setIdx] = useState(0);
@@ -32,7 +37,7 @@ function Controls({ idx, setIdx, playing, setPlaying, total, speed, setSpeed, on
       <button className="btn-secondary" disabled={idx >= total - 1} onClick={() => setIdx(idx + 1)}>Step forward →</button>
       <button className="btn-secondary" onClick={onReset}>Reset</button>
       <label className="ml-2 text-sm">Speed
-        <select className="input ml-2 w-auto" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+        <select className="input ml-2 !w-auto" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
           <option value={1200}>Slow</option>
           <option value={600}>Medium</option>
           <option value={250}>Fast</option>
@@ -129,8 +134,9 @@ const PSEUDO: Record<string, string> = {
 
 const INITIAL = [38, 27, 43, 3, 9, 82, 10];
 
-export function Visualization({ kind }: VizProps) {
+export function Visualization({ kind, showHowToRead = false }: VizProps) {
   const [speed, setSpeed] = useState(600);
+  const [collapsed, setCollapsed] = useState(false);
   const [input, setInput] = useState(INITIAL.join(', '));
   const arr = useMemo(() => {
     const parsed = input.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
@@ -160,7 +166,20 @@ export function Visualization({ kind }: VizProps) {
 
   return (
     <div className="card p-4">
-      <h3 className="text-lg font-bold capitalize">{kind.replace(/-/g, ' ')} visualization</h3>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${kind.replace(/-/g, ' ')} visualization`}
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <span aria-hidden className="text-sm text-muted transition-transform duration-200" style={{ transform: collapsed ? 'none' : 'rotate(90deg)' }}>▸</span>
+          <h3 className="min-w-0 flex-1 truncate text-lg font-bold capitalize">{kind.replace(/-/g, ' ')} visualization</h3>
+        </button>
+        <span className="shrink-0 text-xs font-semibold text-accent-600">{collapsed ? 'Show' : 'Hide'}</span>
+      </div>
+      {!collapsed && (
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div>
           {(kind === 'merge-sort' || kind === 'quick-sort') && (
@@ -263,11 +282,16 @@ export function Visualization({ kind }: VizProps) {
         </div>
         <div>
           <h4 className="font-semibold">Pseudocode</h4>
-          <pre className="mt-2 overflow-auto rounded-lg bg-code p-3 text-xs text-success">{PSEUDO[kind] || 'See the lesson for pseudocode.'}</pre>
-          <h4 className="mt-4 font-semibold">How to read this</h4>
-          <p className="mt-1 text-sm text-muted">Orange marks the elements being compared or moved; green marks finished positions. Step through slowly the first time, then replay at full speed.</p>
+          <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-code p-3 text-xs text-success">{PSEUDO[kind] || 'See the lesson for pseudocode.'}</pre>
+          {showHowToRead && (
+            <>
+              <h4 className="mt-4 font-semibold">How to read this</h4>
+              <p className="mt-1 text-sm text-muted">{HOW_TO_READ_TEXT}</p>
+            </>
+          )}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # CodeForge Academy — Implementation Status
 
-Last updated: 2026-11-24 (100-track expansion, sandbox verification)
+Last updated: 2026-11-24 (phase-2 700-track expansion, sandbox verification)
 
 ## What was built
 
@@ -51,6 +51,7 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 | 9 Analytics/gamification/admin curriculum editor | ✅ Complete |
 | 10 Quality (tests, docs, packaging) | ✅ Complete — verify + smoke green |
 | 11 100-track expansion (93 tracks, 1000 lessons, executors, quiz grading) | ✅ Complete — see verification log below |
+| 12 700-track expansion (100 tracks per core language, ML/Neural, industry + DevOps projects, audit fixes) | ✅ Complete — 793 courses / 8284 lessons, see "Phase 2" below |
 
 ## Curriculum counts (measured from the seeded database)
 
@@ -97,6 +98,16 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 - Runtime detection (`GET /api/execute/runtimes`, built server): python yes, c yes, cpp yes, node yes, go no, rust yes, java yes, bash yes, perl yes, sql yes, csharp/kotlin/swift/php/ruby/dart/scala/haskell/elixir/lua/r/julia/solidity no. (MongoDB/Redis are services, not code runners, and are deliberately not listed.)
 - Fresh-zip verification: see "Fresh-copy (zip) verification" below.
 
+### 700-track expansion (2026-11-24)
+- `node scripts/check-tracks.mjs`: **exit 0, Errors 0, Warnings 0** — Courses 793, Lessons 8284, Exercises 8284; per-language c/cpp/python/typescript/react/rust/go = 100 each; data-ai 31, devops 54 (10 per Ansible/Terraform/Docker/Git); concept openings most-repeated ≤ 2×.
+- `npm run verify` (stages run individually — see bug 19): backend tests **41 passed | 1 skipped** (api 23 incl. the 793/8284 catalog test, git EPIPE regression, Terraform/Ansible/Docker honesty tests, DSA camelCase test; provisioning 18 + 1 skipped), frontend tests **66/66 across 11 files**, Dockerfile COPY check OK, runtime coverage OK (34 languages → 31 runtimes), both builds pass.
+- Smoke test (`node scripts/smoke-test.mjs` against the built server, fresh DB): **22 passed / 0 failed**; seed log `{"courses":793,"lessons":8284,"exercises":8284,"dsa":152,"projects":95,"assessments":793}`.
+- Seed timing (fresh scratch DB, quiet box): **fresh seed 6,986 ms, re-seed 5,409 ms**, identical counts on re-seed (idempotent). Seeded DB file ~105 MB.
+- Batch solution verification (`scripts/verify-solutions.mjs`, 8284 exercises): RUNNING at time of writing — results to be added here. Per-file author verification during generation: C-A 528/528 gcc tests, C-B 108/108 executor spot-check, TS-A 264/264, React-C 528/528, Python-ML 105 lesson + 15 capstones, Python-A/B all solutions executed in Python 3.12, Rust-C 1,254 snippets rustc-verified, Git 52 distinct script patterns executed.
+- Built-server boot: `DATABASE_PATH=/tmp/cf-smoke.db PORT=8080 node backend/dist/index.js` → health `{"status":"ok"}` in ~4 s; seed log as above.
+- Executor spot-checks (real runs): git `5fcdd97 first commit`; terraform 1.17.2 `Success! The configuration is valid.`; ansible/docker honest 503s without binaries; default-import probe — `import fs from 'node:fs'` fails under the executor while `import * as fs` passes (see bug 18).
+- Fresh-zip verification: see "Fresh-copy (700-track zip) verification" below.
+
 ## Bugs found and fixed during verification
 
 1. SQLite UPSERT is rejected on `INSERT ... SELECT` — seed used `INSERT OR IGNORE` + `UPDATE`.
@@ -114,6 +125,11 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 13. **(expansion) SQL duplicate output column names collapsed** — `SELECT e.name, d.name` returns rows as objects from `node:sqlite`, so the second `name` overwrote the first (3 failures). Fixed: when `columns()` shows duplicates, the executor falls back to Python's sqlite3 tuples, preserving every column. Verified: `Ada|Engineering`.
 14. **(expansion) `node:sqlite` static import broke Vitest** — `import { DatabaseSync } from 'node:sqlite'` in `executor.ts` failed test collection ("Failed to load url sqlite"). Fixed by loading it via `createRequire`, same pattern as `src/db/db.ts`.
 15. **(expansion) Build script silently dropped new migrations in `dist`** — `cp -r src/db/migrations dist/db/migrations` nests the directory when the target already exists, so `002`/`003` landed at `dist/db/migrations/migrations/` and the built server booted with a partial catalog (`table courses has no column named category`, seed failed, 0 courses). Fixed: `mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/`. This was a pre-existing v1 bug that only surfaced once a second migration existed; the `tsx` dev path (which reads `src/`) was never affected, which is why v1 tests passed.
+16. **(phase 2) EPIPE crash in the executor** — `runProcess` wrote stdin with no error handler, so fast-exiting commands (`git init`) crashed the backend process with an unhandled socket error. Fixed with a `child.stdin.on('error', …)` guard; regression test added (real git run in `api.test.ts`).
+17. **(phase 2) Seed glob missed the 700-track files under vitest** — `seed.ts` globbed `tracks700-*.js`, but under vitest the files are still `.ts` in `src/`, so tests silently seeded only the 100 old tracks (catalog test got 100, not 793). Fixed: the glob accepts `.js` (dist) and `.ts` (vitest/src); the import uses the filename actually found. Same fix for the `projects-industry-*` glob.
+18. **(phase 2) Default `node:` imports crash under the executor** — `import fs from 'node:fs'` transpiles to an undefined `.default` access (`Cannot read properties of undefined (reading 'readFileSync')`), so 219 solutions in the v1 files (`tracks-web/cs/languages/mobile.ts`) failed at runtime. Probed empirically (default fails, namespace passes), then replaced all 219 with `import * as fs/http/path from 'node:…'`. Verified: 5/5 real fixed solutions from `tracks-web.ts` pass through the executor. The 700-track files already used the namespace form.
+19. **(phase 2) Seed ROLLBACK masked the real error + /tmp disk-full** — `seed.ts` called `ROLLBACK` unconditionally in the catch; when SQLite auto-aborts the transaction (e.g. `SQLITE_FULL`), the ROLLBACK itself throws "cannot rollback - no transaction is active" and hides the original error. Fixed: ROLLBACK is now best-effort inside its own try/catch and the original error propagates. The underlying failure was real: `/tmp` is a 512 MB tmpfs and was 100% full (old scratch DBs + Terraform binary + caches). Cleaned ~360 MB. Consequence for this sandbox: the two backend test files each seed a ~105 MB DB + WAL in `/tmp`, so running them in parallel (vitest default) can exhaust /tmp again — run them serially here (`npx vitest run tests/api.test.ts`, then `tests/provisioning.test.ts`). `verify.sh` itself is unchanged; on a host with a real /tmp this does not apply.
+20. **(phase 2) DSA detail API returned raw snake_case columns** — `GET /api/dsa/problems/:slug` spread the DB row, so `starterCode` was `{}` (empty language dropdown, blank editor), `timeComplexity`/`spaceComplexity` were missing. The frontend had a `normalizeProblem()` defence; the backend now maps the columns to camelCase explicitly. Regression test added in `api.test.ts` (two-sum: starterCode non-empty, complexities `O(n)`/`O(n)`, no snake_case keys leak). The test registers its own student because the shared student session is revoked by the earlier revocation test.
 
 ## Honest limitations
 
@@ -125,7 +141,9 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 - **HTML execution is static tag-balance validation**, not a browser render.
 - **Docker build/run not verified here** (no Docker in sandbox) — see above.
 - **DSA Hard problems are thin** (7 of 152; target mix was ~20% Hard). Easy/Medium coverage is complete.
-- **No live browser click-through** of the frontend in this session (no browser tool in this subagent) — the frontend is verified by build + unit tests + API smoke tests, not by clicking through the UI.
+- **No live browser click-through** of the frontend in this session (no browser tool in this subagent) — the frontend is verified by build + unit tests + API smoke tests, not by clicking through the UI. The phase-2 layout/DSA audit fixes (P0 blank-panel ResizeObserver fix, reference-layout gaps, collapsible DSA) are code + test verified only; **a live browser re-check on the host is still needed after deploy**.
+- **Seeded database is ~105 MB** (793 courses / 8284 lessons of JSON content). Startup seed is ~7 s fresh on this sandbox. In this sandbox `/tmp` is a 512 MB tmpfs: the two backend test files each seed a ~105 MB DB + WAL there, so run them serially (see bug 19) and keep `/tmp` clear of old scratch DBs.
+- **Rust-A content quality flags (unfixed, check-tracks does not catch them):** quizzes rotate across [2,4,7]/[0,3,8]/[3,6,8] rather than fixed 2/4/7, 6 skills/track instead of 8, prerequisites not chained to the previous track, and 3 non-compiling snippets were reported in the rust-box track (the batch solution check is the arbiter — see the phase-2 verification entry).
 - Curriculum prose for some lessons is template-framed with lesson-specific values (see content quality note above).
 - **Code exercises in missing-toolchain languages were verified by careful reading, not by running** (80 exercises: 4 per missing-toolchain track, plus Laravel/ASP.NET Core). Their solutions cannot be executed anywhere in this sandbox; they run (or 503) on hosts with the toolchain.
 
@@ -175,12 +193,41 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 - **Caveats:** no mobile nav was added (below `md` the sidebar stays hidden as before); the output panel has a 4th "Hints" tab beyond the specified Output/Tests/Terminal (the hints UI needed a reachable home after the editor column lost its scrollable below-editor area); not live-verified in a browser (no browser access in this subagent) — resize drags, fullscreen, and the Monaco theme switch are code-verified (tests + `tsc` + build) but not click-tested.
 - **Zip:** both features ship in `~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime.zip` (see fresh-copy verification below). Next phase (queued, not in this zip): 700 tracks (100 per each of the 7 core languages), ML/Neural Networks basic→advanced, and a large industry-projects expansion.
 
+## Phase 2 — 700-track expansion + ML/Neural + industry projects + DevOps tools + audit fixes (2026-11-24)
+
+Kept the existing 100 tracks and added **693 tracks / 6930 lessons** (all 10 lessons each, same compact-track shape: 7 code exercises + 3 quizzes, capstone, 10-question assessment), for totals of **793 courses, 8284 lessons, 8284 exercises, 793 assessments**. Per-language exactly 100 for each of C, C++, Python, TypeScript, React, Rust, Go. New files: `backend/src/curriculum/data/tracks700-{c,cpp,python,typescript,react,rust}-{a,b,c}.ts` (33/33/32–33 tracks each), `tracks700-python-ml.ts` (15 ML/Neural deep dives), `tracks700-devops-tools.ts` (40 Ansible/Terraform/Docker/Git tracks, 10 each), `projects-industry-a/b.ts` (45 industry projects), `projects-industry-c.ts` (12 DevOps-tool projects).
+
+| Group | New tracks | New lessons |
+|---|---|---|
+| C (a/b/c: 33+33+32) | 98 | 980 |
+| C++ (a/b/c: 33+33+33) | 99 | 990 |
+| Python (a/b: 24+23) | 47 | 470 |
+| Python ML/Neural deep dives | 15 | 150 |
+| TypeScript (a/b/c: 33+32+32) | 97 | 970 |
+| React (a/b/c: 33+33+33) | 99 | 990 |
+| Rust (a/b/c: 33+33+33) | 99 | 990 |
+| Go (a/b/c: 33+33+33) | 99 | 990 |
+| DevOps tools (Ansible/Terraform/Docker/Git, 10 each) | 40 | 400 |
+| **New subtotal** | **693** | **6930** |
+| Existing 100-track catalogue | 100 | 1354 |
+| **Grand total** | **793** | **8284** |
+
+Per-language totals (new + existing): C 100, C++ 100, Python 100, TypeScript 100, React 100, Rust 100, Go 100 — verified by `check-tracks.mjs`.
+
+- **ML/Neural Networks basic→advanced:** Python already had ML survey tracks; the 15 new tracks are deep dives (linear algebra/probability for ML, logistic regression + gradient descent from scratch, backpropagation, CNNs, transformers/attention, PCA, MLOps topics), all with runnable NumPy-free pure-Python solutions executed at authoring time. Data & AI category is now 31 tracks.
+- **Industry projects:** 95 total (38 + 45 industry + 12 DevOps-tool) — REST API services, full-stack apps, data pipelines, CI/CD pipelines, ML model services, CLI tools, systems utilities, Terraform VPC/multi-env stacks, Docker containerise-and-ship, Ansible automation, team Git workflows (branching, PRs, rebasing, conflicts, release trains, monorepo migration). Each has requirements, milestones, tests, review checklist, final assessment.
+- **DevOps tools as real executors** (`backend/src/execution/executor.ts`): git runs the submission as a shell script in a fresh repo; ansible runs the submission as a playbook (`hosts: localhost`, `connection: local`, no `become`); terraform runs `init -backend=false` + `validate` on the provider-less HCL; docker builds the submitted Dockerfile (daemon reachability checked first, honest 503 otherwise). Provisioning: git/ansible/terraform are `baked` (apt + official HashiCorp zip for Terraform 1.17.2), docker is `manual` (needs the host daemon + socket mount, CLI baked as a static binary); the runtime-coverage gate passes (34 languages → 31 runtimes). Executor fix: `runProcess` now guards stdin errors (EPIPE crash on fast-exiting commands, found via git).
+- **Seed performance:** `backend/src/db/seed.ts` rewritten to prepare statements once and write everything in a single transaction (imports first, fully synchronous write phase). Fresh seed **~7.0 s**, re-seed **~5.4 s** for the full 793-course catalog on this sandbox (was ~12.9 s / ~8.4 s at 675 courses under load). Seed is idempotent (same counts on re-seed). Seeded DB is ~105 MB.
+- **Layout rule + browser-audit fixes (live host audit, 2026-11-24):** app shell is exactly viewport height (`h-dvh`, no page-level scroll); every panel scrolls independently with its own themed scrollbar (`.panel-scroll`); lesson workspace matches the reference screenshot (file tabs, Lesson/Examples/Quiz tabs, "Lesson N of 12" counter, Previous/Next pinned at bottom, output panel under the editor); sidebar defaults to the 68px icon rail; Monaco re-lays out via `ResizeObserver` (fixes the P0 blank-panel bug — code fix, needs a live browser re-check after deploy); DSA page redesigned learning-first (visualizations/hints/solution behind collapsed-by-default panels); Assessments page added (`/assessments` + sidebar link); version `v1.1.0` shown in the sidebar footer and Profile; course pills fixed via `courseTaxonomy.ts` (language shown only when it is the track's subject); filters in one row; header search syncs/clears on navigation. DSA detail API now returns camelCase (`starterCode`, `timeComplexity`, `spaceComplexity`, `solutionDiscussion`) — the frontend also normalises snake_case as defence.
+- **Counts enforced in tests:** `scripts/check-tracks.mjs` (793/8284, per-language 100, data-ai 31, devops 54 with 10 per tool), `scripts/smoke-test.mjs` (793/8284), backend catalog test (same assertions). The seed glob now accepts `.ts` as well as `.js` so vitest (which runs against `src/`) seeds the 700-track files too — previously it silently seeded only the 100 old tracks in tests.
+- **Zip:** `~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime-700-tracks.zip` (see fresh-copy verification below). Drop-in replacement on the Fedora host: `docker compose down && docker compose build --no-cache && docker compose up -d` from `~/Codeforge-academy`. Ports, compose layout, SQLite volume, GNOME theme, provisioning system unchanged.
+
 ## Docker section
 
 - Deliverables: `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `docker-compose.yml`, `backend/.dockerignore`, `frontend/.dockerignore`, `docs/DOCKER.md`.
 - Ports (consistent everywhere): backend host **:4000** (container :4000), frontend host **:80** (container :80). Local path keeps :8080 / :5173.
 - SQLite persisted in named volume `codeforge-data` at `/app/data/codeforge.db`.
-- The backend image compiles `dist` from `src` at build time, so all 100 tracks (`dist/curriculum/data/*.js`) ship in the image; the fixed build script (bug 15) copies all migrations flat into `dist/db/migrations/`.
+- The backend image compiles `dist` from `src` at build time, so all 793 tracks (`dist/curriculum/data/*.js`) ship in the image; the fixed build script (bug 15) copies all migrations flat into `dist/db/migrations/`.
 - Verified here: YAML parse + cross-checks (see verification log). NOT verified here: `docker compose config`, image build, `up --build`, health endpoint via curl — Docker is absent from the sandbox. These steps must run on a host with Docker.
 
 ## Fresh-copy (zip) verification

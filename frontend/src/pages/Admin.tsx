@@ -73,7 +73,7 @@ export function AdminUsersPage() {
       {error && <p role="alert" className="text-danger">{error}</p>}
       <div className="mb-4 flex flex-wrap gap-2">
         <input className="input max-w-sm" placeholder="Search by email or name…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" />
-        <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Filter by role">
+        <select className="input !w-auto" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Filter by role">
           <option value="">All roles</option><option>student</option><option>instructor</option><option>admin</option><option>super-admin</option>
         </select>
       </div>
@@ -85,7 +85,7 @@ export function AdminUsersPage() {
               <tr key={u.id} className="border-b">
                 <td className="p-3"><div className="font-semibold">{u.displayName}</div><div className="text-xs text-muted">{u.email}</div></td>
                 <td className="p-3">
-                  <select className="input w-auto" value={u.role} onChange={(e) => setRoleFor(u, e.target.value)} aria-label={`Role for ${u.email}`}>
+                  <select className="input !w-auto" value={u.role} onChange={(e) => setRoleFor(u, e.target.value)} aria-label={`Role for ${u.email}`}>
                     <option>student</option><option>instructor</option><option>admin</option><option>super-admin</option>
                   </select>
                 </td>
@@ -214,7 +214,7 @@ export function AdminCurriculumPage() {
         <form onSubmit={create} className="mt-3 flex flex-wrap gap-2">
           <input className="input max-w-xs" placeholder="Slug (e.g. kotlin)" value={slug} onChange={(e) => setSlug(e.target.value)} required />
           <input className="input max-w-sm" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-          <select className="input w-auto" value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <select className="input !w-auto" value={language} onChange={(e) => setLanguage(e.target.value)}>
             <option value="python">Python</option><option value="c">C</option><option value="cpp">C++</option>
             <option value="typescript">TypeScript</option><option value="react">React</option>
             <option value="rust">Rust</option><option value="go">Go</option>

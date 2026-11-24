@@ -84,8 +84,8 @@ async function main() {
   console.log(`  INFO courses in DB: ${nCourses}`);
   const nLessons = (courses.json?.courses || []).reduce((n, c) => n + (c.totalLessons || 0), 0);
   console.log(`  INFO lessons in DB: ${nLessons}`);
-  check('100 courses in catalog', nCourses === 100, `got ${nCourses}`);
-  check('1354 lessons in catalog', nLessons === 1354, `got ${nLessons}`);
+  check('793 courses in catalog', nCourses === 793, `got ${nCourses}`);
+  check('8284 lessons in catalog', nLessons === 8284, `got ${nLessons}`);
   const py = courses.json?.courses?.find((c) => c.slug === 'python');
   check('python course present', !!py);
   const cats = new Set((courses.json?.courses || []).map((c) => c.category));

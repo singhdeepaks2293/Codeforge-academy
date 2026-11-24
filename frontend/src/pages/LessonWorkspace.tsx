@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
+import { CodeEditor } from '../components/MonacoEditor';
 import { api, langToEditor, langToExec } from '../lib/api';
 import { fetchRuntimes, installRuntime, provisioningStatusText, canInstall, kindLabel, type RuntimeInfo } from '../lib/provisioning';
 import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
-import { useTheme } from '../lib/theme';
-import { codeForgeTheme, setupCodeForgeThemes } from '../lib/monacoTheme';
 
 interface LessonContent {
   id: string; slug: string; title: string; objectives: string[]; introduction: string;
@@ -43,11 +41,13 @@ function writeLocal(key: string, value: string): void {
   try { localStorage.setItem(key, value); } catch { /* ignore */ }
 }
 
-type OutputTab = 'output' | 'tests' | 'terminal' | 'hints';
+type OutputTab = 'output' | 'tests' | 'input' | 'hints';
+// 'input' is the stdin box + runtime info, labelled honestly: it is not a
+// real terminal, it is where program input goes.
+type LessonTab = 'lesson' | 'examples' | 'quiz';
 
 export function LessonWorkspacePage() {
   const { slug, lessonId } = useParams();
-  const theme = useTheme();
   const [lesson, setLesson] = useState<LessonContent | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [error, setError] = useState('');
@@ -75,6 +75,10 @@ export function LessonWorkspacePage() {
   const [lessonWidthPct, setLessonWidthPct] = useState<number>(() => Math.min(50, Math.max(20, readNumber(LESSON_WIDTH_KEY, 35))));
   const [navCollapsed, setNavCollapsed] = useState<boolean>(() => readFlag(CURRICULUM_COLLAPSED_KEY));
   const [outputTab, setOutputTab] = useState<OutputTab>('output');
+  const [lessonTab, setLessonTab] = useState<LessonTab>('lesson');
+  // 'Example' file tab: shows the lesson example read-only in the editor
+  // without clobbering the learner's exercise code.
+  const [exampleTab, setExampleTab] = useState(false);
   const [outputCollapsed, setOutputCollapsed] = useState<boolean>(() => readFlag(OUTPUT_COLLAPSED_KEY));
   const [outputHeight, setOutputHeight] = useState<number>(() => Math.min(420, Math.max(120, readNumber(OUTPUT_HEIGHT_KEY, 220))));
   const [expanded, setExpanded] = useState(false);
@@ -166,6 +170,7 @@ export function LessonWorkspacePage() {
         setCode(d.exercises[0]?.starterCode || d.lesson.exampleCode);
         setSelectedEx(0); setHintLevel(0); setHint(null); setHintsUsed(0); setSolutionRevealed(false);
         setTestResults([]); setOutput(''); setQuizAnswers({}); setQuizDone(false); setQuizChoice(null);
+        setLessonTab('lesson'); setExampleTab(false);
       })
       .catch((e) => setError(e.message));
     api<{ course: unknown; modules: { id: string; title: string; lessons: { id: string; title: string }[] }[] }>(`/api/courses/${slug}`)
@@ -210,9 +215,12 @@ export function LessonWorkspacePage() {
     setRunning(true);
     setOutput('');
     setOutputTab('output');
+    // The Example file tab runs the lesson example; exercise tabs run the
+    // learner's code.
+    const codeToRun = exampleTab ? (lesson?.exampleCode ?? '') : code;
     try {
       const r = await api<{ success: boolean; stdout: string; stderr: string; exitCode: number | null; timedOut: boolean; durationMs: number; error?: string }>('/api/execute/run', {
-        method: 'POST', body: JSON.stringify({ language: execLang, code, stdin }),
+        method: 'POST', body: JSON.stringify({ language: execLang, code: codeToRun, stdin }),
       });
       setOutput(`exit code: ${r.exitCode ?? '—'} · ${r.durationMs}ms${r.timedOut ? ' · TIMED OUT' : ''}\n--- stdout ---\n${r.stdout}\n--- stderr ---\n${r.stderr}`);
       if (r.success) toast('Program ran successfully', 'success');
@@ -283,6 +291,20 @@ export function LessonWorkspacePage() {
   const nextLesson = currentIdx >= 0 && currentIdx < flatLessons.length - 1 ? flatLessons[currentIdx + 1] : null;
   const passedCount = testResults.filter((t) => t.passed).length;
 
+  const lessonTabBtn = (tab: LessonTab, label: string) => (
+    <button
+      key={tab}
+      role="tab"
+      aria-selected={lessonTab === tab}
+      onClick={() => setLessonTab(tab)}
+      className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors duration-200 ${
+        lessonTab === tab ? 'border-accent-500 text-accent-600' : 'border-transparent text-muted hover:text-ink'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   const outputTabBtn = (tab: OutputTab, label: string, badge?: string) => (
     <button
       key={tab}
@@ -301,7 +323,7 @@ export function LessonWorkspacePage() {
     <section
       ref={workspaceRef}
       aria-label="Lesson workspace"
-      className={`flex min-h-0 flex-1 flex-col bg-base ${expanded && !isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-base ${expanded && !isFullscreen ? 'fixed inset-0 z-50' : ''}`}
     >
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2 text-sm">
@@ -349,7 +371,7 @@ export function LessonWorkspacePage() {
       {/* Body: curriculum rail | lesson panel | editor column */}
       <div ref={bodyRef} className="flex min-h-0 flex-1">
         {!navCollapsed && !expanded && (
-          <aside className="w-[200px] shrink-0 overflow-y-auto border-r border-line bg-sidebar p-3" aria-label="Curriculum">
+          <aside className="panel-scroll w-[200px] shrink-0 border-r border-line bg-sidebar p-3" aria-label="Curriculum">
             <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-faint">Curriculum</h2>
             {nav?.modules.map((m) => (
               <div key={m.id} className="mb-3">
@@ -367,16 +389,24 @@ export function LessonWorkspacePage() {
 
         {!lessonCollapsed && !expanded && (
           <>
-            <article className="min-h-0 shrink-0 overflow-y-auto bg-surface px-5 py-4" style={{ width: `${lessonWidthPct}%` }} aria-label="Lesson">
-              <div className="flex items-center justify-between gap-2">
-                <h1 className="text-lg font-bold leading-snug">{lesson.title}</h1>
-                <button className="btn-ghost shrink-0 px-2 py-1 text-xs" onClick={toggleLessonCollapsed} aria-label="Collapse lesson panel">‹ Hide</button>
+            <article className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-surface" style={{ width: `${lessonWidthPct}%` }} aria-label="Lesson">
+              <div className="shrink-0 px-5 pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h1 className="min-w-0 text-lg font-bold leading-snug">{lesson.title}</h1>
+                  <button className="btn-ghost shrink-0 px-2 py-1 text-xs" onClick={toggleLessonCollapsed} aria-label="Collapse lesson panel">‹ Hide</button>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-muted">
+                  {nav ? `Lesson ${currentIdx + 1} of ${flatLessons.length}` : 'Lesson'}
+                </p>
+                <div className="mt-3 flex gap-1 border-b border-line" role="tablist" aria-label="Lesson sections">
+                  {lessonTabBtn('lesson', 'Lesson')}
+                  {lessonTabBtn('examples', 'Examples')}
+                  {lessonTabBtn('quiz', 'Quiz')}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {prevLesson && <Link className="btn-secondary px-2 py-1 text-xs" to={`/courses/${slug}/lessons/${prevLesson.id}`}>← {prevLesson.title}</Link>}
-                {nextLesson && <Link className="btn-secondary px-2 py-1 text-xs" to={`/courses/${slug}/lessons/${nextLesson.id}`}>{nextLesson.title} →</Link>}
-              </div>
-
+              <div className="panel-scroll min-h-0 flex-1 px-5 py-4">
+              {lessonTab === 'lesson' && (
+              <>
               <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Learning objectives</h2>
               <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed">{lesson.objectives.map((o, i) => <li key={i}>{o}</li>)}</ul>
 
@@ -391,8 +421,11 @@ export function LessonWorkspacePage() {
 
               <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Real-world analogy</h2>
               <p className="mt-1 text-sm italic leading-relaxed text-muted">{lesson.analogy}</p>
-
-              <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Example</h2>
+              </>
+              )}
+              {lessonTab === 'examples' && (
+              <>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-faint">Example</h2>
               <pre className="mt-1 overflow-auto rounded-lg bg-code p-3 font-mono text-xs leading-relaxed text-success">{lesson.exampleCode}</pre>
               <button className="btn-secondary mt-2" onClick={() => setCode(lesson.exampleCode)}>Load example into editor →</button>
 
@@ -410,14 +443,20 @@ export function LessonWorkspacePage() {
                 <pre className="mt-2 overflow-auto rounded-lg bg-code p-3 font-mono text-xs leading-relaxed text-success">{lesson.debuggingExercise.fixedCode}</pre>
                 <p className="mt-1 leading-relaxed">{lesson.debuggingExercise.explanation}</p>
               </details>
-
-              <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Mini challenge</h2>
+              </>
+              )}
+              {lessonTab === 'lesson' && (
+              <>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-faint">Mini challenge</h2>
               <p className="mt-1 text-sm leading-relaxed">{lesson.miniChallenge}</p>
 
               <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Summary</h2>
               <p className="mt-1 text-sm leading-relaxed">{lesson.summary}</p>
-
-              <h2 className="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Knowledge check</h2>
+              </>
+              )}
+              {lessonTab === 'quiz' && (
+              <>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-faint">Knowledge check</h2>
               {lesson.knowledgeCheck.map((q, qi) => (
                 <div key={qi} className="mt-2 rounded-lg border border-line bg-elevated p-3">
                   <p className="text-sm font-medium">{qi + 1}. {q.question}</p>
@@ -437,6 +476,17 @@ export function LessonWorkspacePage() {
                 </div>
               ))}
               {!quizDone && <button className="btn-secondary mt-2" onClick={() => setQuizDone(true)}>Check answers</button>}
+              </>
+              )}
+              </div>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-5 py-3">
+                {prevLesson
+                  ? <Link className="btn-secondary px-3 py-1.5 text-xs" title={prevLesson.title} to={`/courses/${slug}/lessons/${prevLesson.id}`}>← Previous</Link>
+                  : <span />}
+                {nextLesson
+                  ? <Link className="btn-primary px-3 py-1.5 text-xs" title={nextLesson.title} to={`/courses/${slug}/lessons/${nextLesson.id}`}>Next →</Link>
+                  : <span className="text-xs text-muted">Last lesson in this course</span>}
+              </div>
             </article>
             <div
               role="separator"
@@ -459,8 +509,8 @@ export function LessonWorkspacePage() {
         )}
 
         {/* Editor column */}
-        <div className="flex min-w-0 flex-1 flex-col bg-base">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-base">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
             <h2 className="text-sm font-bold">Code editor — {lesson.exampleLanguage}</h2>
             <span className={`text-xs ${!runtime || !runtimeStatus ? 'text-muted' : runtimeStatus.tone === 'ok' ? 'text-success' : runtimeStatus.tone === 'muted' ? 'text-muted' : runtimeStatus.tone === 'busy' || runtimeStatus.tone === 'warn' ? 'text-warning' : 'text-danger'}`}>
               {runtime && runtimeStatus ? runtimeStatus.text : 'Runtime status unknown'}
@@ -468,21 +518,27 @@ export function LessonWorkspacePage() {
             <div className="ml-auto flex flex-wrap gap-2">
               <button className="btn-primary" onClick={run} disabled={running}>{running ? 'Running…' : '▶ Run'}</button>
               <button className="btn-secondary" onClick={() => setCode(ex?.starterCode || lesson.exampleCode)}>Reset</button>
-              <button className="btn-primary" onClick={submit} disabled={submitting || !ex || (isQuizEx && quizChoice === null)}>{submitting ? 'Submitting…' : isQuizEx ? '✓ Submit answer' : '✓ Submit & test'}</button>
+              <button className="btn-primary" onClick={submit} disabled={submitting || !ex || exampleTab || (isQuizEx && quizChoice === null)}>{submitting ? 'Submitting…' : isQuizEx ? '✓ Submit answer' : '✓ Submit & test'}</button>
             </div>
           </div>
 
-          {exercises.length > 1 && (
-            <div className="flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1.5" role="tablist" aria-label="Exercise files">
-              {exercises.map((e, i) => (
-                <button key={e.id} role="tab" aria-selected={i === selectedEx}
-                  className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors duration-200 ${i === selectedEx ? 'bg-accent-500 text-white' : 'bg-elevated text-muted hover:text-ink'}`}
-                  onClick={() => { setSelectedEx(i); setCode(e.starterCode); setHint(null); setHintLevel(0); setQuizChoice(null); setTestResults([]); }}>
-                  {e.title}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* File tabs: one per exercise plus the lesson example (read-only).
+              Always visible, even with a single exercise — the reference
+              layout has real file tabs, not just a heading. */}
+          <div className="panel-scroll-x flex shrink-0 gap-1 border-b border-line bg-surface px-2 py-1.5" role="tablist" aria-label="Editor files">
+            {exercises.map((e, i) => (
+              <button key={e.id} role="tab" aria-selected={i === selectedEx && !exampleTab}
+                className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors duration-200 ${i === selectedEx && !exampleTab ? 'bg-accent-500 text-white' : 'bg-elevated text-muted hover:text-ink'}`}
+                onClick={() => { setSelectedEx(i); setCode(e.starterCode); setHint(null); setHintLevel(0); setQuizChoice(null); setTestResults([]); setExampleTab(false); }}>
+                ▤ {e.title}
+              </button>
+            ))}
+            <button role="tab" aria-selected={exampleTab}
+              className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors duration-200 ${exampleTab ? 'bg-accent-500 text-white' : 'bg-elevated text-muted hover:text-ink'}`}
+              onClick={() => setExampleTab(true)}>
+              ▤ Example
+            </button>
+          </div>
 
           {ex && (
             <div className="border-b border-line bg-surface px-3 py-2 text-sm">
@@ -503,24 +559,13 @@ export function LessonWorkspacePage() {
             </div>
           )}
 
-          <div className="min-h-0 flex-1">
-            <Editor
-              height="100%"
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <CodeEditor
               language={langToEditor(lesson.exampleLanguage)}
-              value={code}
-              onChange={(v) => setCode(v || '')}
-              theme={codeForgeTheme(theme)}
-              beforeMount={setupCodeForgeThemes}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                automaticLayout: true,
-                fontFamily: 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                fontLigatures: false,
-                scrollBeyondLastLine: false,
-                renderLineHighlight: 'line',
-                tabSize: 2,
-              }}
+              value={exampleTab ? lesson.exampleCode : code}
+              onChange={(v) => setCode(v)}
+              ariaLabel={exampleTab ? 'Lesson example code (read-only)' : 'Code editor'}
+              options={{ readOnly: exampleTab }}
             />
           </div>
 
@@ -537,7 +582,7 @@ export function LessonWorkspacePage() {
               <div className="flex items-center gap-1 border-b border-line px-2 py-1">
                 {outputTabBtn('output', 'Output')}
                 {outputTabBtn('tests', 'Tests', testResults.length ? `${passedCount}/${testResults.length}` : undefined)}
-                {outputTabBtn('terminal', 'Terminal')}
+                {outputTabBtn('input', 'Input')}
                 {outputTabBtn('hints', 'Hints', hint ? String(hintLevel) : undefined)}
                 <div className="ml-auto flex items-center gap-1">
                   <button
@@ -553,7 +598,7 @@ export function LessonWorkspacePage() {
                 </div>
               </div>
               {!outputCollapsed && (
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+                <div className="panel-scroll min-h-0 flex-1 px-3 py-2">
                   {outputTab === 'output' && (
                     output
                       ? <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-ink">{output}</pre>
@@ -574,10 +619,10 @@ export function LessonWorkspacePage() {
                       <p className="text-xs text-muted">No test results yet — press “Submit &amp; test” to run the exercise tests.</p>
                     )
                   )}
-                  {outputTab === 'terminal' && (
+                  {outputTab === 'input' && (
                     <div className="space-y-3">
                       <div>
-                        <label className="label" htmlFor="stdin">Standard input (stdin)</label>
+                        <label className="label" htmlFor="stdin">Standard input (stdin) — this is program input, not a terminal</label>
                         <input id="stdin" className="input" placeholder="e.g. 3 4" value={stdin} onChange={(e) => setStdin(e.target.value)} />
                       </div>
                       <div className="text-xs leading-relaxed text-muted">

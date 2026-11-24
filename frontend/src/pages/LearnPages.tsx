@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
+import { APP_VERSION } from '../lib/version';
 
 interface DashboardData {
   xp: number; streak: number; activity: { activity_date: string; xp: number; lessons_completed: number; exercises_solved: number }[];
@@ -108,10 +109,14 @@ export function ProfilePage() {
 
   return (
     <Page title="Profile" subtitle="Your account, sessions and security.">
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* items-start: the sessions card hugs its content instead of stretching
+          to the height of the profile/password column (which left a large
+          empty bottom half). */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="card p-4">
           <h2 className="font-bold">Profile</h2>
           <p className="text-sm text-muted">{user?.email} · Role: {user?.role}</p>
+          <p className="mt-1 text-xs text-faint">CodeForge Academy v{APP_VERSION}</p>
           <form onSubmit={saveProfile} className="mt-3 space-y-3">
             <div><label className="label" htmlFor="dn">Display name</label><input id="dn" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
             <button className="btn-primary" type="submit">Save profile</button>

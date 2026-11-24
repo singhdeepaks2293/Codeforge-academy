@@ -93,6 +93,10 @@ export async function detectRuntimes(): Promise<RuntimeInfo[]> {
     { id: 'r', name: 'R', bin: 'Rscript', args: ['--version'], hint: 'Install R from https://cran.r-project.org/.' },
     { id: 'julia', name: 'Julia', bin: 'julia', args: ['--version'], hint: 'Install Julia from https://julialang.org/downloads/.' },
     { id: 'solidity', name: 'Solidity (solc)', bin: 'solc', args: ['--version'], hint: 'Install solc from https://docs.soliditylang.org/en/latest/installing-solidity.html.' },
+    { id: 'git', name: 'Git', bin: 'git', args: ['--version'], hint: 'Install Git: `sudo apt install git` (Debian/Ubuntu) or https://git-scm.com/downloads.' },
+    { id: 'ansible', name: 'Ansible', bin: 'ansible-playbook', args: ['--version'], hint: 'Install Ansible: `sudo apt install ansible` (Debian/Ubuntu) or `pip install ansible`.' },
+    { id: 'terraform', name: 'Terraform', bin: 'terraform', args: ['version'], hint: 'Install Terraform 1.17+ from https://releases.hashicorp.com/terraform/.' },
+    { id: 'docker', name: 'Docker (CLI)', bin: 'docker', args: ['--version'], hint: 'Install Docker Engine from https://docs.docker.com/engine/install/ and make sure the daemon is running.' },
     // NOTE: MongoDB / Redis are services, not code runners — their tracks are
     // quiz-style, so they are deliberately NOT listed here; runCode still
     // answers 503 runtime_unavailable for them instead of a fake pass.
@@ -153,12 +157,17 @@ function runProcess(cmd: string, args: string[], cwd: string, opts: SpawnOpts): 
       clearTimeout(timer);
       resolve({ success: code === 0 && !timedOut, stdout, stderr, exitCode: code, timedOut, durationMs: Date.now() - started });
     });
+    // A fast-exiting child (e.g. `git init`) may close stdin before the
+    // write lands; that raises EPIPE on the stdin socket. It is not a run
+    // failure — the close event above decides the result — so swallow it
+    // instead of letting it crash the backend process.
+    child.stdin.on('error', () => { /* child exited before reading stdin */ });
     if (opts.stdin !== undefined) { child.stdin.end(opts.stdin); } else { child.stdin.end(); }
   });
 }
 
 export interface RunRequest {
-  language: string; // python | c | cpp | javascript | typescript | react | go | rust | java | bash | perl | sql | asm | html
+  language: string; // python | c | cpp | javascript | typescript | react | go | rust | java | bash | perl | sql | asm | html | git | ansible | terraform | docker
   code: string;
   stdin?: string;
   timeoutMs?: number;
@@ -200,7 +209,9 @@ export async function runCode(req: RunRequest): Promise<RunResult> {
         const bin = await execOrUnavailable('g++');
         if (!bin) return unavailable('cpp');
         await writeFile(join(workdir, 'main.cpp'), req.code);
-        const comp = await runProcess(bin, ['-O2', '-std=c++17', '-Wall', '-o', 'prog', 'main.cpp'], workdir, { timeoutMs, stdin: '' });
+        // C++20: the curriculum teaches std::format, ranges, concepts and
+        // coroutines, all of which fail to compile under -std=c++17.
+        const comp = await runProcess(bin, ['-O2', '-std=c++20', '-Wall', '-o', 'prog', 'main.cpp'], workdir, { timeoutMs, stdin: '' });
         if (!comp.success) return { ...comp, success: false, error: 'compilation failed' };
         return runProcess(join(workdir, 'prog'), [], workdir, { timeoutMs, stdin: req.stdin });
       }
@@ -239,16 +250,29 @@ fs.writeFileSync('main.js',out.outputText);`;
         const tsc = resolveModule('typescript/lib/typescript.js');
         const reactDom = resolveModule('react-dom/server');
         const react = resolveModule('react');
+        const reactDomPkg = resolveModule('react-dom');
+        const reactJsx = resolveModule('react/jsx-runtime');
         if (!tsc || !react || !reactDom) return { success: false, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0, runtimeUnavailable: true, error: 'React/TypeScript packages are not installed (npm packages "typescript", "react", "react-dom" missing). Run npm install.' };
+        // User code that imports React (e.g. `import { useState } from "react"`)
+        // transpiles to require("react"), which Node cannot resolve from the
+        // temp workspace (no node_modules there). Rewrite those requires to
+        // the bundled packages' absolute paths so the code runs for real.
         const runner = `const ts=require(${JSON.stringify(tsc)});const fs=require('fs');
 const React=require(${JSON.stringify(react)});const {renderToString}=require(${JSON.stringify(reactDom)});
 global.React=React; // components written in modern JSX style omit the React import
 const src=fs.readFileSync('App.tsx','utf8');
 const out=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,jsxFactory:'React.createElement'},fileName:'App.tsx'});
-fs.writeFileSync('App.js',out.outputText);
+const remap=${JSON.stringify({ react, 'react-dom': reactDomPkg, 'react-dom/server': reactDom, 'react/jsx-runtime': reactJsx })};
+let js=out.outputText;
+for (const [spec,abs] of Object.entries(remap)) { if(!abs) continue; const q=JSON.stringify(abs); js=js.split('require("'+spec+'")').join('require('+q+')'); js=js.split("require('"+spec+"')").join('require('+q+')'); }
+fs.writeFileSync('App.js',js);
 const mod=require('./App.js');const App=mod.default||mod.App||mod;
 const html=renderToString(React.createElement(App));
-console.log(html);`;
+// React 19's renderToString inserts <!-- --> separators between static text
+// and dynamic values (e.g. "Count: <!-- -->0"), so the printed output
+// would not contain the visible text "Count: 0". Strip those separators:
+// the rendered text is what learners and tests should see.
+console.log(html.replace(/<!-- -->/g, ''));`;
         await writeFile(join(workdir, 'App.tsx'), req.code);
         await writeFile(join(workdir, '_render.cjs'), runner);
         const r = await runProcess(bin, ['_render.cjs'], workdir, { timeoutMs, stdin: '' });
@@ -373,6 +397,68 @@ console.log(html);`;
       case 'scala': { const r = await runScript('scala', 'Main.scala'); return r!; }
       case 'haskell': { const r = await runScript('runghc', 'Main.hs'); return r!; }
       case 'dart': { const r = await runScript('dart', 'main.dart'); return r!; }
+    case 'git': {
+      // Git exercises are command scripts run in a fresh repo: the
+      // executor initialises the repo and configures an identity, then
+      // runs the submitted script with bash. Tests check the script's
+      // stdout (e.g. `git log --oneline` output).
+      const bin = await execOrUnavailable('git');
+      if (!bin) return unavailable('git');
+      const bashBin = await execOrUnavailable('bash');
+      if (!bashBin) return unavailable('bash');
+      const init = await runProcess(bin, ['init', '-q', '.'], workdir, { timeoutMs, stdin: '' });
+      if (!init.success) return { ...init, success: false, error: 'git init failed' };
+      await runProcess(bin, ['config', 'user.email', 'learner@codeforge.local'], workdir, { timeoutMs, stdin: '' });
+      await runProcess(bin, ['config', 'user.name', 'CodeForge Learner'], workdir, { timeoutMs, stdin: '' });
+      await writeFile(join(workdir, 'script.sh'), req.code);
+      return runProcess(bashBin, ['script.sh'], workdir, { timeoutMs, stdin: req.stdin });
+    }
+    case 'ansible': {
+      // The submitted code IS a playbook (YAML). Syntax-check first (fast,
+      // real feedback), then run it for real against localhost with a local
+      // connection. Playbooks must use `hosts: localhost`,
+      // `connection: local`, `gather_facts: false` and must not use
+      // `become` (no privilege in the run) or remote hosts.
+      const bin = await execOrUnavailable('ansible-playbook');
+      if (!bin) return unavailable('ansible');
+      await writeFile(join(workdir, 'playbook.yml'), req.code);
+      const check = await runProcess(bin, ['--syntax-check', 'playbook.yml'], workdir, { timeoutMs, stdin: '' });
+      if (!check.success) return { ...check, success: false, error: 'ansible-playbook --syntax-check failed' };
+      return runProcess(bin, ['-i', 'localhost,', '-c', 'local', 'playbook.yml'], workdir, { timeoutMs, stdin: '' });
+    }
+    case 'terraform': {
+      // The submitted code IS a Terraform configuration (HCL). init (no
+      // backend, no input) then validate; the reported stdout is
+      // validate's real verdict ("Success! The configuration is valid.").
+      // Configs must be provider-less (variables / locals / outputs /
+      // terraform_data) so init works offline — provider configs are
+      // quiz-graded, not executed.
+      const bin = await execOrUnavailable('terraform');
+      if (!bin) return unavailable('terraform');
+      await writeFile(join(workdir, 'main.tf'), req.code);
+      const init = await runProcess(bin, ['init', '-backend=false', '-input=false', '-no-color'], workdir, { timeoutMs, stdin: '' });
+      if (!init.success) return { ...init, success: false, error: 'terraform init failed' };
+      return runProcess(bin, ['validate', '-no-color'], workdir, { timeoutMs, stdin: '' });
+    }
+    case 'docker': {
+      // The submitted code IS a Dockerfile. The CLI alone is not enough:
+      // the daemon must be reachable, or this is an honest 503 (see
+      // docs/DOCKER.md — mount the host docker socket for the
+      // containerised backend). Builds use the fixed tag codeforge-test
+      // so tests can match the naming line in the build output.
+      const bin = await execOrUnavailable('docker');
+      if (!bin) return unavailable('docker');
+      const info = await runProcess(bin, ['info'], workdir, { timeoutMs, stdin: '' });
+      if (!info.success) {
+        return {
+          success: false, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: info.durationMs,
+          runtimeUnavailable: true,
+          error: 'Docker daemon is not reachable from this backend. Install Docker Engine and make sure the daemon is running; for the containerised backend, mount the host Docker socket (see docs/DOCKER.md).',
+        };
+      }
+      await writeFile(join(workdir, 'Dockerfile'), req.code);
+      return runProcess(bin, ['build', '-t', 'codeforge-test', '.'], workdir, { timeoutMs, stdin: '' });
+    }
       // Known languages with no simple single-file runner on a plain host:
       // report honestly instead of a fake pass or a bare "unsupported".
       case 'csharp':

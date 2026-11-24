@@ -93,7 +93,9 @@ beforeAll(async () => {
   });
   expect(reg.res.status).toBe(201);
   studentCookie = jarHeader();
-}, 60000);
+  // Full-catalog seed is ~40s for ~600 courses on this slow sandbox (see
+  // api.test.ts) — the hook timeout must cover it.
+}, 120000);
 
 afterAll(() => {
   server?.close();

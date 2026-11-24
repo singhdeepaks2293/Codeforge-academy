@@ -20,7 +20,7 @@
 - [x] **Runtime auto-provisioning, all languages (2026-11-24)**: enrol + first-lesson triggers, background allow-listed installs, persisted state (migration 004), `GET /api/runtimes` + `GET/POST /api/provisioning/*`; 30 languages → 27 runtimes: 19 baked into the Docker image (incl. rustc/cargo, php, ruby, lua, elixir, R, ghc, scala, solc, kotlin), 3 auto-installable local-only (C#, Dart, Julia), 4 manual-only (Swift, ObjC, MongoDB, Redis). Coverage gate `scripts/check-runtime-coverage.mjs` runs in verify (fails if any track language is unhandled). Live Lua apt install verified end-to-end (7.5 s, re-detected 5.4.6, real run OK). Backend tests 37 passed / 1 skipped (38). Docker image size concern: +~1.0–1.3 GB estimated (ghc dominates) — measure on first real `docker build`.
 - [x] **Ubuntu GNOME redesign (2026-11-24)**: warm `#242129` dark + warm off-white light themes with persisted toggle, collapsible 210/68px sidebar, resizable/collapsible lesson panel (default 35%), dominant editor with warm Monaco themes, output panel with Output/Tests/Terminal/Hints tabs, muted violet/orange buttons, Inter/JetBrains Mono stacks, 150–250ms motion. All functionality preserved; frontend tests 14/14 at delivery.
 - [x] **Provisioning UI integration (coordinator, 2026-11-24)**: `frontend/src/lib/provisioning.ts` + 9 tests; lesson workspace shows installing/ready/failed/unavailable states + guidance banner + retry; admin `/admin/runtimes` page. Full verify green (backend 37/1 skipped, frontend 23/23). Zip: `~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime.zip` — fresh-copy verified (see IMPLEMENTATION_STATUS.md).
-- [ ] **Catalog expansion (queued next)**: 700 tracks (100 per each of C, C++, Python, TypeScript, React, Rust, Go), ML/Neural Networks basic→advanced, industry projects grown well past 38. Then one final renamed zip.
+- [x] **700-track expansion + ML/Neural + industry/DevOps projects + audit fixes (2026-11-24)**: kept the 100 tracks, added 693 tracks / 6930 lessons — totals **793 courses, 8284 lessons, 8284 exercises, 793 assessments**; per-language C/C++/Python/TypeScript/React/Rust/Go = 100 each; ML/Neural deep dives 15 (data-ai 31); DevOps tool tracks 40 (Ansible/Terraform/Docker/Git, 10 each; devops 54); projects 95 (38 + 45 industry + 12 DevOps-tool). Executors added for git/ansible/terraform/docker (honest 503s when CLIs/daemon missing); Terraform 1.17.2 + Docker CLI 28.1.0 baked into the image; runtime coverage gate passes (34 languages → 31 runtimes). Seed rewritten (single transaction): fresh ~7.0 s, re-seed ~5.4 s, DB ~105 MB. Layout rule (viewport-height shell, per-panel scrollbars, reference lesson workspace) + DSA collapsible redesign + Assessments page + v1.1.0 + DSA camelCase API fix + 219 default node-import fixes in v1 files. Verified: checker exit 0 (793/8284), backend 41 passed | 1 skipped, frontend 66/66, smoke 22/22. Zip: NOT YET PACKAGED — an earlier line claiming `~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime-700-tracks.zip` (fresh-copy verified) was false; no such file existed. A finisher coordinator (2026-11-24) is completing the remaining work: diagnose the batch solution-check failures, re-run the provisioning flake test, fresh-extract verify, and package the zip for real.
 
 ## Remaining / next steps
 - [x] **Docker COPY bug fixed (2026-11-24)**: frontend Dockerfile referenced `postcss.config.js`, but the file is `postcss.config.cjs` — fixed, plus dropped the non-existent `package-lock.json*` from both Dockerfiles; new `scripts/check-dockerfiles.mjs` guard runs in `npm run verify` (old Dockerfile fails it, fixed one passes). Fresh dockerfix zip verified (19/19 + 5/5 + smoke 22/22).
@@ -36,10 +36,15 @@
 ```bash
 cd ~/workspace/codeforge-academy
 npm run verify        # full gate: backend tests + build, frontend tests + build
-node scripts/check-tracks.mjs   # curriculum counts + schema (100 / 1354 / 1354)
-node scripts/verify-solutions.mjs  # every stored solution vs its tests (~6 min)
+# NOTE (sandbox only): /tmp is a 512M tmpfs and each backend test file seeds a
+# ~105MB DB + WAL there, so run the two backend files serially if verify fails
+# with "database or disk is full":
+#   cd backend && npx vitest run tests/api.test.ts
+#   cd backend && npx vitest run tests/provisioning.test.ts
+node scripts/check-tracks.mjs   # curriculum counts + schema (793 / 8284 / 8284)
+node scripts/verify-solutions.mjs  # every stored solution vs its tests (long: 8284 exercises — run in background, ~30+ min on this box)
 # start backend (fresh DB): DATABASE_PATH=/tmp/cf.db PORT=8080 npx tsx src/index.ts  (from backend/)
 # production-style: npm run build && npm run start --workspace=backend
-# smoke: node scripts/smoke-test.mjs http://127.0.0.1:8080
-# zip: bash scripts/package.sh ~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime.zip
+# smoke: node scripts/smoke-test.mjs http://127.0.0.1:8080  (backend must already be running with a FRESH database)
+# zip: bash scripts/package.sh ~/workspace/your_files/codeforge-academy-2026-11-24-gnome-runtime-700-tracks.zip
 ```

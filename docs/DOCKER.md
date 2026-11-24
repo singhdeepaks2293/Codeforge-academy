@@ -55,7 +55,7 @@ Local (no-Docker) defaults are intentionally different: backend :8080, frontend 
 
 ## Runtimes in the Docker image
 
-Every language used by the 100 tracks, DSA and projects has a defined provisioning path — baked into the image, auto-installable on a local/dev host, or explicitly manual-only. Nothing is silently missing. The source of truth is `backend/src/services/provisioning.ts` (`RUNTIME_CATALOG` + `LANGUAGE_TO_RUNTIME`); `scripts/check-runtime-coverage.mjs` (run by `make verify`) fails the build if any track language has no path.
+Every language used by the tracks, DSA and projects has a defined provisioning path — baked into the image, auto-installable on a local/dev host, or explicitly manual-only. Nothing is silently missing. The source of truth is `backend/src/services/provisioning.ts` (`RUNTIME_CATALOG` + `LANGUAGE_TO_RUNTIME`); `scripts/check-runtime-coverage.mjs` (run by `make verify`) fails the build if any track language has no path.
 
 | Language / track | Runtime | Docker image | Local/dev host | Notes |
 |---|---|---|---|---|
@@ -86,6 +86,23 @@ Every language used by the 100 tracks, DSA and projects has a defined provisioni
 | Objective-C | `clang` | Not in image | **Manual only** | macOS: Xcode; Linux: GNUstep. No single-file ObjC runner exists yet, so the track stays quiz-graded even with a toolchain |
 | MongoDB | `mongod` | Not in image | **Manual only** | A database service, not a code runner — the track is quiz-style |
 | Redis | `redis-server` | Not in image | **Manual only** | A service, not a code runner — the track is quiz-style |
+| Git | `git` | **Baked** (`git`) | apt/dnf/brew/choco | Exercises are shell scripts run in a fresh repo (executor does `git init` + identity) |
+| Ansible | `ansible-playbook` | **Baked** (`ansible`) | apt/dnf/brew, `pip install ansible` | Submitted code IS a playbook: syntax-check, then a real run against localhost (`-c local`); no `become`, no remote hosts |
+| Terraform | `terraform` | **Baked** (official 1.17.2 zip) | **Auto** (official zip, Linux) | `terraform init -backend=false` then `terraform validate`; configs are provider-less (variables/locals/outputs) so init works offline |
+| Docker | `docker` | **CLI baked** (official static binary) | **Manual only** (needs the Engine daemon) | The image ships only the CLI — see "Docker exercises need the host daemon" below |
+
+### Docker exercises need the host daemon
+
+The backend image ships only the Docker **CLI** — there is no Docker Engine daemon inside the container, and a daemon cannot run usefully there. Docker exercises (`docker build`) therefore need the CLI to reach a daemon:
+
+- **Containerised backend (opt-in):** mount the host Docker socket into the backend container. In `deployments/compose/docker-compose.yml`, add to the `api` service (and `worker`, if it runs Docker exercises):
+  ```yaml
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  ```
+  **Security warning:** the Docker socket is effectively host root — a container with socket access can start privileged containers and read host files. Only enable this on a trusted local/learning host, never on a shared or internet-exposed one. This mount is NOT in the default compose file for exactly that reason.
+- **Without the socket mount** (the default), Docker exercises honestly return 503 `runtime_unavailable` with an explanation — they are never faked as passing.
+- **Local/dev backend (`npm run dev`):** no mount needed — the backend runs on the host, so the CLI talks to the host daemon directly once Docker Engine is installed and running.
 
 ### Two deployment realities
 

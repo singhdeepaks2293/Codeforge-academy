@@ -11,6 +11,19 @@ describe('language mapping', () => {
     expect(langToEditor('rust')).toBe('rust');
     expect(langToEditor('go')).toBe('go');
   });
+  it('maps DevOps tool languages to Monaco editor languages', () => {
+    expect(langToEditor('ansible')).toBe('yaml');
+    expect(langToEditor('docker')).toBe('dockerfile');
+    expect(langToEditor('git')).toBe('shell');
+    // Terraform's HCL has no Monaco language: plaintext, not a fake guess.
+    expect(langToEditor('terraform')).toBe('plaintext');
+  });
+  it('passes DevOps tool languages through to the execution engine', () => {
+    expect(langToExec('ansible')).toBe('ansible');
+    expect(langToExec('terraform')).toBe('terraform');
+    expect(langToExec('docker')).toBe('docker');
+    expect(langToExec('git')).toBe('git');
+  });
   it('maps react to the react execution mode', () => {
     expect(langToExec('react')).toBe('react');
     expect(langToExec('python')).toBe('python');

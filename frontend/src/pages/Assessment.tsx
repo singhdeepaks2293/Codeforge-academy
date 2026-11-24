@@ -6,6 +6,71 @@ import { useToast } from '../components/Toast';
 import { Page } from '../components/Layout';
 import { useTheme } from '../lib/theme';
 import { codeForgeTheme, setupCodeForgeThemes } from '../lib/monacoTheme';
+import { CATEGORIES, coursePill } from '../lib/courseTaxonomy';
+
+// Standalone assessments list (/assessments). Built from existing APIs only
+// — no new backend endpoint: GET /api/courses gives every track (each track
+// has an end-of-track assessment at /assessments/:slug) and
+// GET /api/progress/dashboard gives mastery_passed per course, so the list
+// can show which assessments are already passed. Pass mark is 80% for every
+// assessment (enforced by scripts/check-tracks.mjs).
+export function AssessmentsListPage() {
+  const [courses, setCourses] = useState<{ slug: string; title: string; language: string; category?: string; totalLessons: number }[]>([]);
+  const [passed, setPassed] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState('');
+  const [category, setCategory] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api<{ courses: typeof courses }>('/api/courses').then((d) => setCourses(d.courses)).catch((e) => setError(e.message));
+    api<{ courses: { slug: string; mastery_passed: number }[] }>('/api/progress/dashboard')
+      .then((d) => setPassed(new Set(d.courses.filter((c) => c.mastery_passed).map((c) => c.slug))))
+      .catch(() => undefined);
+  }, []);
+
+  const filtered = courses.filter((c) => {
+    if (category && c.category !== category) return false;
+    if (q && !c.title.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  });
+  const passedCount = courses.filter((c) => passed.has(c.slug)).length;
+
+  return (
+    <Page title="Assessments" subtitle={`${courses.length} end-of-track assessments · pass mark 80% · ${passedCount} passed. Each assessment has conceptual, code-reading and debugging questions, programming exercises and a capstone — retakes allowed.`}>
+      {error && <p role="alert" className="text-danger">{error}</p>}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input className="input min-w-0 flex-1 sm:max-w-sm" placeholder="Search assessments…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search assessments" />
+        <select className="input shrink-0 !w-auto" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+          <option value="">All categories</option>
+          {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <span className="text-sm text-muted">{filtered.length} assessment{filtered.length === 1 ? '' : 's'}</span>
+      </div>
+      {filtered.length === 0 && <div className="card p-6 text-center text-muted">No assessments match your filters.</div>}
+      <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((c) => {
+          const isPassed = passed.has(c.slug);
+          return (
+            <article key={c.slug} className="card flex flex-col p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="badge bg-accent-soft text-accent-600">{coursePill(c)}</span>
+                {isPassed
+                  ? <span className="badge bg-success-soft text-success">✓ Passed</span>
+                  : <span className="badge bg-elevated text-muted">Not passed</span>}
+              </div>
+              <h2 className="mt-2 text-lg font-bold">{c.title}</h2>
+              <p className="mt-1 flex-1 text-sm text-muted">{c.totalLessons} lessons · pass mark 80%</p>
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
+                <Link className="text-sm font-semibold text-accent-600" to={`/courses/${c.slug}`}>Course →</Link>
+                <Link className="btn-primary" to={`/assessments/${c.slug}`}>{isPassed ? 'Retake assessment' : 'Take assessment →'}</Link>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </Page>
+  );
+}
 
 interface AssessmentData {
   assessment: {

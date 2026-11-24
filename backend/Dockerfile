@@ -2,7 +2,7 @@
 # Build:  docker build -t codeforge-backend ./backend
 # Run:    docker run -p 4000:4000 -v codeforge-data:/app/data -e SESSION_SECRET=... codeforge-backend
 #
-# RUNTIME COVERAGE — every language used by the 100 tracks, DSA and projects
+# RUNTIME COVERAGE — every language used by the tracks, DSA and projects
 # is either baked into this image, auto-installable on a local/dev host, or
 # explicitly manual-only. See docs/DOCKER.md for the full matrix and
 # backend/src/services/provisioning.ts (RUNTIME_CATALOG) for the source of
@@ -10,7 +10,7 @@
 # CANNOT happen inside a running container — baking into the image is the
 # Docker path; on-demand auto-install is for local/dev deployments only.
 #
-# Baked into this image (apt on Debian bookworm, + two official downloads):
+# Baked into this image (apt on Debian bookworm, + official downloads):
 #   python3, gcc, g++ (build-essential: C/C++/asm + headers/libs), golang-go,
 #   default-jre-headless (Java single-file launch; no javac needed),
 #   perl, rustc + cargo (bookworm ships Rust 1.63 — older than rustup stable
@@ -18,13 +18,18 @@
 #   elixir, r-base-core (Rscript), ghc (Haskell runghc — the big one,
 #   ~650 MB installed; kept because completeness beats size here),
 #   scala (needs the JRE above), solc (official static binary),
-#   kotlinc (official compiler zip; needs the JRE above).
+#   kotlinc (official compiler zip; needs the JRE above),
+#   git, ansible (DevOps tool tracks), terraform (official release zip),
+#   docker CLI only (official static bundle — client binary, NO daemon;
+#   the CLI talks to the HOST daemon, so the containerised backend needs
+#   the host docker socket mounted for Docker exercises, see docs/DOCKER.md).
 # Auto-installable on local/dev hosts only (NOT in this image):
 #   C# (.NET SDK via dotnet-install), Dart (official SDK zip),
-#   Julia (official tarball). See the provisioning service.
+#   Julia (official tarball), Terraform (official zip). See the provisioning service.
 # Manual-only everywhere (no unattended install exists):
 #   Swift (platform-specific ~700 MB toolchains), Objective-C (Xcode/GNUstep),
-#   MongoDB / Redis (services, not code runners — those tracks are quiz-style).
+#   MongoDB / Redis (services, not code runners — those tracks are quiz-style),
+#   Docker Engine daemon (the image ships only the CLI; the daemon is host-side).
 # Built-in (no install ever needed): SQL (node:sqlite), HTML (static check).
 # Node.js itself (TS/JS/React) is the base image.
 #
@@ -46,11 +51,13 @@ RUN npm run build && npm prune --omit=dev
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 # Real code-execution runtimes + tini for signal handling + curl/unzip for
-# the two official toolchain downloads below.
+# the official toolchain downloads below. git + ansible are the DevOps tool
+# tracks' CLIs (apt on bookworm); terraform + the docker CLI come as
+# official downloads below (no apt package).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     python3 gcc g++ build-essential golang-go default-jre-headless perl tini \
-    ca-certificates curl unzip \
+    ca-certificates curl unzip git ansible \
     rustc cargo php-cli ruby lua5.4 elixir r-base-core ghc scala \
   && rm -rf /var/lib/apt/lists/* \
   && ln -sf /usr/bin/lua5.4 /usr/local/bin/lua \
@@ -67,6 +74,23 @@ RUN curl -fsSL https://github.com/JetBrains/kotlin/releases/download/v1.9.24/kot
   && ln -sf /usr/local/kotlinc/bin/kotlinc /usr/local/bin/kotlinc \
   && ln -sf /usr/local/kotlinc/bin/kotlin /usr/local/bin/kotlin \
   && rm /tmp/kotlin-compiler.zip
+# Terraform: official release binary (no apt package on bookworm).
+RUN curl -fsSL https://releases.hashicorp.com/terraform/1.17.2/terraform_1.17.2_linux_amd64.zip \
+    -o /tmp/terraform.zip \
+  && unzip -q /tmp/terraform.zip -d /usr/local/bin \
+  && chmod +x /usr/local/bin/terraform \
+  && rm /tmp/terraform.zip
+# Docker CLI only (client binary from the official static bundle — no
+# daemon in this image). The CLI talks to the HOST daemon: the
+# containerised backend needs the host docker socket mounted (see
+# docs/DOCKER.md); without it, Docker exercises honestly report
+# runtime_unavailable.
+RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-28.1.0.tgz \
+    -o /tmp/docker.tgz \
+  && tar -xzf /tmp/docker.tgz -C /tmp docker/docker \
+  && mv /tmp/docker/docker /usr/local/bin/docker \
+  && chmod +x /usr/local/bin/docker \
+  && rm -rf /tmp/docker.tgz /tmp/docker
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

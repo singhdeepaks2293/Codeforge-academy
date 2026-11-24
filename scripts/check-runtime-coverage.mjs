@@ -52,6 +52,7 @@ for (const lang of [...languages].sort()) {
     const aptHit = (def.aptPackages || []).some((p) => dockerfile.includes(p));
     const dlHit = def.installer === 'solc' ? dockerfile.includes('solc-static-linux')
       : def.installer === 'kotlin' ? dockerfile.includes('kotlin-compiler')
+      : def.installer === 'terraform' ? dockerfile.includes('releases.hashicorp.com/terraform')
       : false;
     if (!baseImageHit && !aptHit && !dlHit) failures.push(`${lang} -> ${runtimeId}: kind=baked but no apt package, installer marker, or base-image provision in backend/Dockerfile`);
   }

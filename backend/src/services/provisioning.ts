@@ -36,7 +36,7 @@ export type ProvisionState =
   | 'install_unavailable'; // cannot be auto-installed here (see reason)
 
 export type ProvisionKind = 'builtin' | 'baked' | 'auto' | 'manual';
-export type InstallerId = 'none' | 'rustup' | 'dotnet' | 'dart' | 'julia' | 'kotlin' | 'solc';
+export type InstallerId = 'none' | 'rustup' | 'dotnet' | 'dart' | 'julia' | 'kotlin' | 'solc' | 'terraform';
 
 export interface RuntimeDef {
   id: string;
@@ -209,11 +209,31 @@ export const RUNTIME_CATALOG: RuntimeDef[] = [
     installHint: H('Redis is a service, not a code runtime — the track is quiz-style; install redis-server to explore it locally.'),
     manualSteps: 'Manual only: Redis is a server, not a code runner — the track is quiz-style and never executes code against it. To explore locally: Debian/Ubuntu `sudo apt install redis-server`, macOS `brew install redis`, or Docker: `docker run -d -p 6379:6379 redis`.',
     serves: ['redis'] },
+  { id: 'git', name: 'Git', binary: 'git', versionArgs: ['--version'], kind: 'baked', dockerBaked: true,
+    aptPackages: ['git'], dnfPackages: ['git'], brewFormula: 'git', chocoPackage: 'git', installer: 'none',
+    installHint: H('Install Git: `sudo apt install git` (Debian/Ubuntu) or https://git-scm.com/downloads.'),
+    manualSteps: 'Debian/Ubuntu: `sudo apt install git`. macOS: `brew install git` (or Xcode CLT). Windows: `choco install git` or https://git-scm.com/download/win.',
+    serves: ['git'] },
+  { id: 'ansible', name: 'Ansible', binary: 'ansible-playbook', versionArgs: ['--version'], kind: 'baked', dockerBaked: true,
+    aptPackages: ['ansible'], dnfPackages: ['ansible'], brewFormula: 'ansible', chocoPackage: 'ansible', installer: 'none',
+    installHint: H('Install Ansible: `sudo apt install ansible` (Debian/Ubuntu) or `pip install ansible`.'),
+    manualSteps: 'Debian/Ubuntu: `sudo apt install ansible`. macOS: `brew install ansible`. Windows: use WSL, then `sudo apt install ansible`. Or `pip install ansible` (needs Python 3.10+).',
+    serves: ['ansible'] },
+  { id: 'terraform', name: 'Terraform', binary: 'terraform', versionArgs: ['version'], kind: 'baked', dockerBaked: true,
+    aptPackages: null, dnfPackages: null, brewFormula: 'hashicorp/tap/terraform', chocoPackage: 'terraform', installer: 'terraform',
+    installHint: H('Install Terraform 1.17+ from https://releases.hashicorp.com/terraform/ (unzip the binary onto PATH).'),
+    manualSteps: 'Download the Terraform 1.17.2 zip for your platform from https://releases.hashicorp.com/terraform/1.17.2/, unzip it, and put the `terraform` binary on PATH. Debian/Ubuntu (HashiCorp apt repo): add https://apt.releases.hashicorp.com, then `sudo apt install terraform`. macOS: `brew tap hashicorp/tap && brew install hashicorp/tap/terraform`. Windows: `choco install terraform`.',
+    serves: ['terraform'] },
+  { id: 'docker', name: 'Docker (CLI + daemon)', binary: 'docker', versionArgs: ['--version'], kind: 'manual', dockerBaked: true,
+    aptPackages: null, dnfPackages: null, brewFormula: 'docker', chocoPackage: 'docker', installer: 'none',
+    installHint: H('Docker needs the Engine daemon, not just the CLI — install Docker Engine and make sure the daemon is running.'),
+    manualSteps: 'Manual only: install Docker Engine from https://docs.docker.com/engine/install/ (Debian/Ubuntu: `sudo apt install docker.io` or the official docker-ce repo; macOS/Windows: Docker Desktop) and start the daemon. The backend image ships only the Docker CLI: for the containerised backend, also mount the host Docker socket into the backend container (see docs/DOCKER.md) — without it, Docker exercises report runtime_unavailable honestly. Running the backend locally (npm run dev) with Docker installed on the same host works directly.',
+    serves: ['docker'] },
 ];
 
 export const RUNTIME_BY_ID = new Map(RUNTIME_CATALOG.map((r) => [r.id, r]));
 
-/** Course `language` id -> runtime id. Covers all 30 course languages. */
+/** Course `language` id -> runtime id. Covers all 34 course languages. */
 export const LANGUAGE_TO_RUNTIME: Record<string, string> = {};
 for (const def of RUNTIME_CATALOG) for (const lang of def.serves) LANGUAGE_TO_RUNTIME[lang] = def.id;
 
@@ -580,6 +600,21 @@ async function planInstall(def: RuntimeDef, env: InstallEnv, opts: ProvisionDeps
     ];
     if (privileged) cmds.push(prefixed(env, 'ln', ['-sf', join(binDir, 'solc'), '/usr/local/bin/solc']));
     return { ok: true, method: 'solc-static-binary', commands: cmds, binDir };
+  }
+  if (def.installer === 'terraform') {
+    if (env.platform !== 'linux') return { ok: false, reason: 'Terraform zip auto-install is Linux-only here', guidance: def.manualSteps };
+    const version = '1.17.2';
+    const zip = join(tmpdir(), `codeforge-terraform-${version}.zip`);
+    const binDir = join(runtimesDir, 'bin');
+    const cmds: PlannedCommand[] = [
+      { cmd: 'curl', args: ['-sSfL', `https://releases.hashicorp.com/terraform/${version}/terraform_${version}_linux_amd64.zip`, '-o', zip] },
+    ];
+    if (!(await d.whichFn('unzip'))) cmds.push(...(await unzipInstallCommands(env, opts)));
+    cmds.push({ cmd: 'mkdir', args: ['-p', binDir] });
+    cmds.push({ cmd: 'unzip', args: ['-q', '-o', zip, '-d', binDir] });
+    cmds.push({ cmd: 'chmod', args: ['+x', join(binDir, 'terraform')] });
+    if (privileged) cmds.push(prefixed(env, 'ln', ['-sf', join(binDir, 'terraform'), '/usr/local/bin/terraform']));
+    return { ok: true, method: 'terraform', commands: cmds, binDir };
   }
 
   // 3. Nothing applies — say exactly why.

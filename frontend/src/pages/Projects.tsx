@@ -30,20 +30,22 @@ export function ProjectsPage() {
   return (
     <Page title="Project Academy" subtitle="Guided, industry-style projects — requirements, planning, milestones, code review and final assessment. No copy-paste solutions: you build it, milestone by milestone.">
       {error && <p role="alert" className="text-danger">{error}</p>}
-      <div className="mb-4 flex gap-2">
-        <select className="input w-auto" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Filter by level">
+      {/* Same `.input` vs `w-auto` cascade note as Courses: `!w-auto` is required. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select className="input shrink-0 !w-auto" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Filter by level">
           <option value="">All levels</option>
           {[1, 2, 3, 4].map((l) => <option key={l} value={l}>Level {l} — {LEVEL_NAMES[l]}</option>)}
         </select>
+        <span className="text-sm text-muted">{filtered.length} project{filtered.length === 1 ? '' : 's'}</span>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid items-start gap-4 md:grid-cols-2">
         {filtered.map((p) => (
-          <article key={p.id} className="card p-5">
-            <span className="badge bg-accent-soft text-accent-600">Level {p.level} · {LEVEL_NAMES[p.level]}</span>
+          <article key={p.id} className="card flex flex-col p-4">
+            <span className="badge w-fit bg-accent-soft text-accent-600">Level {p.level} · {LEVEL_NAMES[p.level]}</span>
             <h2 className="mt-2 text-lg font-bold">{p.title}</h2>
             <p className="mt-1 text-sm text-muted">{p.description}</p>
             <div className="mt-2 flex flex-wrap gap-1">{p.skills.slice(0, 5).map((s) => <span key={s} className="badge bg-elevated text-muted">{s}</span>)}</div>
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
               <span className="text-xs text-muted">{p.language}{p.progress ? ` · ${p.progress.status}` : ''}</span>
               <Link className="btn-primary" to={`/projects/${p.slug}`}>Open project →</Link>
             </div>

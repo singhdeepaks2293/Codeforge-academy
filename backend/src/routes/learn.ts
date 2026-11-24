@@ -39,11 +39,18 @@ dsaRouter.get('/problems/:slug', requireAuth, (req: AuthedRequest, res) => {
   const p = conn.prepare('SELECT * FROM dsa_problems WHERE slug = ?').get(req.params.slug) as Record<string, unknown> | undefined;
   if (!p) { res.status(404).json({ error: 'problem not found' }); return; }
   const tests = (parseJson(String(p.tests), []) as { hidden: boolean }[]).filter((t) => !t.hidden);
+  // Map the snake_case DB columns to the camelCase names the frontend uses
+  // (starterCode, timeComplexity, spaceComplexity, solutionDiscussion).
+  // Previously the raw row was spread straight into the response, so the
+  // editor saw starterCode={} and the complexity line was blank.
   res.json({
     problem: {
-      ...p, topics: parseJson(String(p.topics), []), examples: parseJson(String(p.examples), []),
-      constraints: parseJson(String(p.constraints), []), starterCode: parseJson(String(p.starterCode), {}),
+      id: p.id, slug: p.slug, title: p.title, difficulty: p.difficulty,
+      description: p.description,
+      topics: parseJson(String(p.topics), []), examples: parseJson(String(p.examples), []),
+      constraints: parseJson(String(p.constraints), []), starterCode: parseJson(String(p.starter_code), {}),
       tests, hints: parseJson(String(p.hints), []),
+      solutionDiscussion: p.solution_discussion, timeComplexity: p.time_complexity, spaceComplexity: p.space_complexity,
     },
   });
 });
