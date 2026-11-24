@@ -18,7 +18,8 @@
 - [x] **Build-script migration bug fixed**: `cp -r src/db/migrations dist/db/migrations` nested the dir on rebuilds, so migrations 002/003 never reached `dist` and the built server seeded 0 courses. Fixed to `mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/`.
 
 ## Remaining / next steps
-- [ ] **Docker verification on a host with Docker**: `docker compose config`, `docker compose up --build -d`, `curl http://localhost:4000/api/health`, open http://localhost/, complete setup wizard, run a Python exercise. Record results in IMPLEMENTATION_STATUS.md.
+- [x] **Docker COPY bug fixed (2026-11-24)**: frontend Dockerfile referenced `postcss.config.js`, but the file is `postcss.config.cjs` — fixed, plus dropped the non-existent `package-lock.json*` from both Dockerfiles; new `scripts/check-dockerfiles.mjs` guard runs in `npm run verify` (old Dockerfile fails it, fixed one passes). Fresh dockerfix zip verified (19/19 + 5/5 + smoke 22/22).
+- [ ] **Docker run on a host with Docker**: `docker compose up --build -d` still never run anywhere (no Docker in sandbox) — re-run it from the dockerfix zip on a host with Docker, then `curl http://localhost:4000/api/health`, open http://localhost/, complete setup wizard, run a Python exercise. Record results in IMPLEMENTATION_STATUS.md.
 - [ ] **More Hard DSA problems**: only 7 of 152 are Hard; add ~20 Hard problems across Graphs/DP/Trees to reach the intended mix.
 - [ ] **Live browser click-through** of the frontend (lesson workspace, admin pages, catalog category filter) — needs a browser-capable agent.
 - [ ] **Go on the local path**: install Go on the dev host if Go lessons must run locally (Docker image already ships Go).
