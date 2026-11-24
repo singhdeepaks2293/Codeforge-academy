@@ -27,7 +27,9 @@
 #   textfsm, netmiko, nornir, napalm, ncclient, paramiko, pynetbox, requests,
 #   xmltodict, pyats; and AI-build Python libraries: numpy, CPU-only torch
 #   (from the PyTorch CPU index — the default PyPI wheel is the CUDA
-#   bundle), mcp (Python MCP SDK 2.x), pytest, uv.
+#   bundle), mcp (Python MCP SDK 2.x), pytest, uv; and tesseract-ocr (apt)
+#   + PyMuPDF and pytesseract (pip) for the network-knowledge project
+#   (PDF extraction + OCR).
 # Auto-installable on local/dev hosts only (NOT in this image):
 #   C# (.NET SDK via dotnet-install), Dart (official SDK zip),
 #   Julia (official tarball), Terraform (official zip). See the provisioning service.
@@ -47,7 +49,10 @@
 # pip layer was measured at ~213 MB in the build sandbox), plus ~805 MB
 # installed for CPU-only torch (210 MB download; the tiny GPT trains in
 # ~136 s on shared CPU in the build sandbox) and ~10 MB for mcp + pytest
-# + numpy + uv. That is the
+# + numpy + uv, plus ~60 MB for tesseract-ocr and ~40 MB for PyMuPDF
+# (estimates from the packages' Installed-Size fields and wheel sizes;
+# NOT measured from a real docker build — no Docker in the build sandbox).
+# That is the
 # deliberate cost of covering every track in the image; the sizes are
 # estimates from the packages' Installed-Size fields and have NOT been
 # measured from a real `docker build` here (no Docker in the build
@@ -70,7 +75,7 @@ ENV NODE_ENV=production
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     python3 python3-pip gcc g++ build-essential golang-go default-jre-headless perl tini \
-    ca-certificates curl unzip git ansible \
+    ca-certificates curl unzip git ansible tesseract-ocr \
     rustc cargo php-cli ruby lua5.4 elixir r-base-core ghc scala \
   && rm -rf /var/lib/apt/lists/* \
   && ln -sf /usr/bin/lua5.4 /usr/local/bin/lua \
@@ -92,6 +97,12 @@ RUN pip3 install --break-system-packages \
 # MCPServer from mcp.server.mcpserver — older guides call it FastMCP.)
 RUN pip3 install --break-system-packages --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
   && pip3 install --break-system-packages --no-cache-dir mcp pytest numpy uv
+# Network-knowledge project: PyMuPDF for PDF text extraction and
+# pytesseract as the Tesseract OCR binding (tesseract-ocr itself is in the
+# apt set above). Installed as root here, before USER node; the executor
+# runs `python3 -I`, which still sees system site-packages, so the
+# project's extraction and OCR exercises run for real in the image.
+RUN pip3 install --break-system-packages --no-cache-dir PyMuPDF pytesseract
 # Solidity: official static binary (no apt package on bookworm).
 RUN curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.26/solc-static-linux \
     -o /usr/local/bin/solc \

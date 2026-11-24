@@ -84,8 +84,8 @@ async function main() {
   console.log(`  INFO courses in DB: ${nCourses}`);
   const nLessons = (courses.json?.courses || []).reduce((n, c) => n + (c.totalLessons || 0), 0);
   console.log(`  INFO lessons in DB: ${nLessons}`);
-  check('863 courses in catalog', nCourses === 863, `got ${nCourses}`); // 793 phase-2 + 70 network-automation tracks
-  check('8984 lessons in catalog', nLessons === 8984, `got ${nLessons}`); // 8284 + 700
+  check('864 courses in catalog', nCourses === 864, `got ${nCourses}`); // 793 phase-2 + 70 network-automation tracks + 1 lightweight-LLM track
+  check('8996 lessons in catalog', nLessons === 8996, `got ${nLessons}`); // 8284 + 700 + 12
   const py = courses.json?.courses?.find((c) => c.slug === 'python');
   check('python course present', !!py);
   const cats = new Set((courses.json?.courses || []).map((c) => c.category));

@@ -220,17 +220,17 @@ describe('code execution (real)', () => {
 });
 
 describe('700-track catalog + new executors', () => {
-  it('catalog has 863 courses and 8984 lessons across 7 categories', async () => {
+  it('catalog has 864 courses and 8996 lessons across 7 categories', async () => {
     const { res, json } = await req('/api/courses');
     expect(res.status).toBe(200);
     const courses = json?.courses as { slug: string; totalLessons: number; category?: string; language?: string }[];
-    expect(courses.length).toBe(863); // 793 phase-2 + 70 network-automation tracks
-    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(8984); // 8284 + 700
+    expect(courses.length).toBe(864); // 793 phase-2 + 70 network-automation tracks + 1 lightweight-LLM track
+    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(8996); // 8284 + 700 + 12
     const cats = new Set(courses.map((c) => c.category));
     expect([...cats].sort()).toEqual(['cs-career', 'data-ai', 'databases', 'devops', 'languages', 'mobile', 'web']);
     const dataAi = await req('/api/courses?category=data-ai');
     const dataCourses = (dataAi.json?.courses || []) as { category?: string }[];
-    expect(dataCourses.length).toBe(31); // 16 existing + 15 new ML/neural tracks
+    expect(dataCourses.length).toBe(32); // 16 existing + 15 new ML/neural tracks + 1 lightweight-LLM track
     expect(dataCourses.every((c) => c.category === 'data-ai')).toBe(true);
     const devops = await req('/api/courses?category=devops');
     const devopsCourses = (devops.json?.courses || []) as { category?: string; language?: string }[];
@@ -241,7 +241,7 @@ describe('700-track catalog + new executors', () => {
     for (const [tool, n] of [['ansible', 30], ['terraform', 10], ['docker', 10], ['git', 10]] as const) {
       expect(devopsCourses.filter((c) => c.language === tool).length).toBe(n);
     }
-    for (const [lang, n] of [['c', 100], ['cpp', 100], ['python', 150], ['typescript', 100], ['react', 100], ['rust', 100], ['go', 100]] as const) {
+    for (const [lang, n] of [['c', 100], ['cpp', 100], ['python', 151], ['typescript', 100], ['react', 100], ['rust', 100], ['go', 100]] as const) {
       expect(courses.filter((c) => c.language === lang).length).toBe(n);
     }
     const py = courses.find((c) => c.slug === 'python');
