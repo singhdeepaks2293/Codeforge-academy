@@ -1,0 +1,61 @@
+# CodeForge Academy — Docker Compose (production-like local deployment)
+#   docker compose up --build -d
+#   docker compose ps
+#   docker compose logs -f
+#   docker compose down        (keeps the SQLite volume)
+#   docker compose down -v     (DELETES all users, progress and data)
+#
+# Ports (kept consistent everywhere — see README and docs/DOCKER.md):
+#   frontend  http://localhost/        (host :80  -> container :80)
+#   backend   http://localhost:4000    (host :4000 -> container :4000, /api/health)
+# Local (no Docker) defaults are different on purpose: backend :8080, frontend :5173.
+# Change the host ports by editing the `ports:` lines below.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: codeforge-backend:1.0.0
+    container_name: codeforge-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "4000"
+      DATABASE_PATH: /app/data/codeforge.db
+      # Change this before exposing the stack beyond localhost.
+      # Override with a real secret in .env (SESSION_SECRET=...) — compose
+      # reads .env automatically. The default below is for local use only.
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-change-me-before-sharing-this-host}
+      RUN_TIMEOUT_MS: ${RUN_TIMEOUT_MS:-10000}
+      # Runtimes the image ships: python3, gcc, g++, go.
+      # Rust is not in the image; the API reports it unavailable (see docs/DOCKER.md).
+      RUNTIME_EXTRA_PATHS: /usr/local/go/bin
+    ports:
+      - "4000:4000"
+    volumes:
+      - codeforge-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: codeforge-frontend:1.0.0
+    container_name: codeforge-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+
+volumes:
+  codeforge-data:
+    name: codeforge-data
