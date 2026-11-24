@@ -9,7 +9,7 @@
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json ./
 RUN npm install --no-audit --no-fund
 COPY tsconfig.json ./
 COPY src ./src

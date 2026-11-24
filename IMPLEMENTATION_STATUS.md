@@ -129,6 +129,13 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 - Curriculum prose for some lessons is template-framed with lesson-specific values (see content quality note above).
 - **Code exercises in missing-toolchain languages were verified by careful reading, not by running** (80 exercises: 4 per missing-toolchain track, plus Laravel/ASP.NET Core). Their solutions cannot be executed anywhere in this sandbox; they run (or 503) on hosts with the toolchain.
 
+## Docker build fix (2026-11-24)
+
+- **Bug:** `docker compose up --build` failed on the user's host at frontend build step 5/7: `COPY index.html vite.config.ts tsconfig.json tailwind.config.js postcss.config.js ./` → `"/postcss.config.js": not found`. Root cause: v1 renamed the file to `postcss.config.cjs` (it uses `module.exports` under `"type": "module"`) but `frontend/Dockerfile` was never updated. Same latent issue in both Dockerfiles: `COPY package.json package-lock.json* ./` referenced a lockfile that does not exist in either build context (`frontend/` and `backend/` have no `package-lock.json`; the only lockfile is at the repo root, outside both contexts).
+- **Fix:** `frontend/Dockerfile` now copies `postcss.config.cjs`; both Dockerfiles now use `COPY package.json ./`. No application code changed.
+- **Guard:** new `scripts/check-dockerfiles.mjs` verifies every build-stage `COPY` source exists in its build context and is not excluded by `.dockerignore`; it now runs first in `scripts/verify.sh`. Proven: the old Dockerfile fails it with exactly the reported error (`FAIL frontend/Dockerfile: COPY source not found: postcss.config.js`, exit 1); the fixed one passes (exit 0).
+- **Verification of the fix:** fresh-extracted `codeforge-academy-2026-11-24-100-tracks-dockerfix.zip` passes the Dockerfile check + `npm run verify` (backend 19/19, frontend 5/5) + built-server smoke 22/22. The actual `docker compose up --build` still has NOT been run anywhere (no Docker in this sandbox) — the user must re-run it on their host; that is the remaining Docker proof.
+
 ## Docker section
 
 - Deliverables: `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `docker-compose.yml`, `backend/.dockerignore`, `frontend/.dockerignore`, `docs/DOCKER.md`.
@@ -141,12 +148,14 @@ Supporting changes in this expansion: `category` column on courses (migration 00
 
 Zip: `~/workspace/your_files/codeforge-academy-2026-11-24-100-tracks.zip` — **109 files, 1.8 MB**, no `node_modules`/`dist`/`.env`/`*.db`. `unzip -l` confirms all 7 `tracks-*.ts` files, `builder.ts`, migrations 001–003, and the new scripts.
 
-Fresh-copy check (2026-11-24 ~05:46 IST, exact commands, clean dir `/tmp/cf-100tracks-verify`):
+Fresh-copy check (2026-11-24 ~05:49 IST, exact commands, clean dir `~/workspace/.cf-verify` — note: `/tmp` here is a 512M tmpfs; the first attempt under `/tmp` failed with `ENOSPC` during `npm install`, so the fresh copy was extracted under `~/workspace` instead and the scratch dir deleted afterwards):
 - `unzip -q ~/workspace/your_files/codeforge-academy-2026-11-24-100-tracks.zip` → `codeforge-academy/`
 - `npm install --no-audit --no-fund` → `added 360 packages`
 - `bash scripts/verify.sh` → **verify OK — backend 19/19, frontend 5/5**
 - `npm run build --workspace=backend` → `dist/db/migrations/` contains `001_init.sql`, `002_add_course_category.sql`, `003_add_exercise_options.sql` (build-script fix, bug 15, confirmed in the artifact)
-- `DATABASE_PATH=/tmp/cf-spot.db PORT=18083 node backend/dist/index.js` → `{"status":"ok"}` on `/api/health`; seed log `{"courses":100,"lessons":1354,"exercises":1354,"dsa":152,"projects":38,"assessments":100}`
+- `DATABASE_PATH=/tmp/cf-spot.db PORT=18085 node backend/dist/index.js` → `{"status":"ok"}` on `/api/health`; seed log `{"courses":100,"lessons":1354,"exercises":1354,"dsa":152,"projects":38,"assessments":100}`
 - Spot-check script vs that built server (setup → register → first-lesson solution submit per group): **java PASS, vue PASS, react-native PASS, statistics PASS, postgresql PASS, linux-bash PASS, operating-systems PASS**; html-css quiz = multiple-choice, 4 options, no `answer_index` leak.
+
+The same check was first run against the pre-repackaging zip (~05:46 IST, `/tmp/cf-100tracks-verify`, port 18083) with identical results; the zip was then repackaged only to include the finished fresh-copy section in `IMPLEMENTATION_STATUS.md`, and the check above was re-run against the final zip.
 
 Source-tree smoke after the final edits: `node scripts/smoke-test.mjs` → **22 passed, 0 failed**.

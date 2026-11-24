@@ -3,6 +3,8 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+echo "== Dockerfile COPY check =="
+node scripts/check-dockerfiles.mjs
 echo "== backend tests =="
 npm run test --workspace=backend
 echo "== backend build =="
