@@ -36,6 +36,10 @@ export default {
         'danger-soft': 'rgb(var(--danger) / 0.12)',
         warning: 'rgb(var(--warning) / <alpha-value>)',
         'warning-soft': 'rgb(var(--warning) / 0.12)',
+        // Codecademy-style progress yellow: the % pill and the hatched
+        // progress fill accent. Backed by --pill-yellow in index.css.
+        'pill-yellow': 'rgb(var(--pill-yellow) / <alpha-value>)',
+        'pill-yellow-ink': 'rgb(var(--pill-yellow-ink) / <alpha-value>)',
       },
       fontFamily: {
         // Inter first when installed; otherwise the system UI stack.

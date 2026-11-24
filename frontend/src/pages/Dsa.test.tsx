@@ -92,11 +92,15 @@ describe('DsaListPage', () => {
     expect(screen.getAllByText(/How to read this/i)).toHaveLength(1);
   });
 
-  it('lays the filters out in a single row', async () => {
+  it('puts the filters in a narrow left rail, with search in the content column', async () => {
     renderList();
     await screen.findByText('Two Sum');
-    const search = screen.getByLabelText('Search problems');
-    expect(search.parentElement?.className).toContain('flex-nowrap');
+    const rail = document.querySelector('aside[aria-label="Filters"]') as HTMLElement;
+    expect(rail).toBeInTheDocument();
+    expect(within(rail).getByLabelText('Filter by difficulty')).toBeInTheDocument();
+    expect(within(rail).getByLabelText('Filter by topic')).toBeInTheDocument();
+    expect(rail.querySelector('input[aria-label="Search problems"]')).toBeNull();
+    expect(screen.getByLabelText('Search problems')).toBeInTheDocument();
   });
 
   it('wraps pseudocode instead of clipping it horizontally', async () => {

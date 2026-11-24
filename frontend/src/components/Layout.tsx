@@ -1,47 +1,69 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCan } from '../context/AuthContext';
 import { useToast } from './Toast';
 import { applyTheme, useTheme } from '../lib/theme';
 import { APP_VERSION } from '../lib/version';
 
-const SIDEBAR_KEY = 'cf-sidebar-collapsed';
-const SIDEBAR_EXPANDED = 210;
-const SIDEBAR_COLLAPSED = 68;
+interface NavItem { to: string; label: string; }
 
-interface NavItem { to: string; label: string; icon: string; }
-
-const studentNav: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: '⌂' },
-  { to: '/courses', label: 'Explore Courses', icon: '▦' },
-  { to: '/my-learning', label: 'My Learning', icon: '✓' },
-  { to: '/paths', label: 'Learning Paths', icon: '⤳' },
-  { to: '/practice', label: 'Practice · DSA', icon: '⌘' },
-  { to: '/projects', label: 'Projects', icon: '▣' },
-  { to: '/assessments', label: 'Assessments', icon: '✎' },
-  { to: '/achievements', label: 'Achievements', icon: '★' },
-  { to: '/progress', label: 'Progress', icon: '▤' },
-  { to: '/profile', label: 'Profile', icon: '◉' },
-  { to: '/settings', label: 'Settings', icon: '⚙' },
-];
-const adminNav: NavItem[] = [
-  { to: '/admin', label: 'Admin Dashboard', icon: '▤' },
-  { to: '/admin/users', label: 'Users', icon: '◉' },
-  { to: '/admin/roles', label: 'Roles & Permissions', icon: '⚑' },
-  { to: '/admin/curriculum', label: 'Course Management', icon: '▦' },
-  { to: '/admin/submissions', label: 'Submissions', icon: '✉' },
-  { to: '/admin/audit', label: 'Audit Logs', icon: '≡' },
-  { to: '/admin/settings', label: 'System Settings', icon: '⚙' },
+const headerNav: NavItem[] = [
+  { to: '/courses', label: 'Catalog' },
+  { to: '/', label: 'My Home' },
+  { to: '/paths', label: 'Paths' },
+  { to: '/practice', label: 'Practice' },
+  { to: '/projects', label: 'Projects' },
+  { to: '/assessments', label: 'Assessments' },
 ];
 
-function readCollapsed(): boolean {
-  // No saved preference yet: the narrow icon rail is the default (the
-  // reference layout). Expanding to the wide labelled sidebar is a choice,
-  // persisted the first time the user toggles it.
-  try {
-    const v = localStorage.getItem(SIDEBAR_KEY);
-    return v === null ? true : v === '1';
-  } catch { return true; }
+// Extra destinations that do not fit the main nav row: the locked-feature
+// equivalents (all free in CodeForge), Docs and Cheatsheets.
+const moreNav: NavItem[] = [
+  { to: '/features/skill-paths', label: 'Skill Paths' },
+  { to: '/features/careers', label: 'Career Paths' },
+  { to: '/features/quizzes', label: 'Quizzes' },
+  { to: '/features/challenges', label: 'Challenges' },
+  { to: '/features/interview', label: 'Interview Prep' },
+  { to: '/features/certificates', label: 'Certificates' },
+  { to: '/features/bootcamps', label: 'Bootcamps' },
+  { to: '/features/coach', label: 'Coach' },
+  { to: '/features/builder', label: 'AI Builder' },
+  { to: '/docs', label: 'Docs' },
+  { to: '/cheatsheets', label: 'Cheatsheets' },
+];
+
+/**
+ * Hatched progress bar with a yellow % pill.
+ * Used on course cards, the dashboard and the course page — one shared
+ * component so the progress treatment stays identical everywhere.
+ */
+export function HatchedProgress({ percent, label }: { percent: number; label?: string }) {
+  const pct = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 min-w-0 flex-1 rounded bg-line" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? `Progress ${pct}%`}>
+        <div className="progress-hatch h-2 rounded bg-accent-500" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="pill-yellow shrink-0" data-testid="progress-pill">{pct}%</span>
+    </div>
+  );
+}
+
+/**
+ * Index-page layout: a narrow left filter rail + the content column.
+ * The rail is for filters/navigation only — never for the main nav, which
+ * lives in the top header. On narrow screens the rail stacks above the
+ * content.
+ */
+export function IndexLayout({ rail, children }: { rail: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start">
+      <aside aria-label="Filters" className="w-full shrink-0 md:w-56">
+        <div className="card p-4 md:sticky md:top-0">{rail}</div>
+      </aside>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
 }
 
 export function Layout() {
@@ -49,18 +71,20 @@ export function Layout() {
   const canAdmin = useCan('users.read');
   const theme = useTheme();
   const dark = theme === 'dark';
-  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [q, setQ] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const navRef = useRef<HTMLElement>(null);
 
-  // The sidebar keeps its own scroll position per page otherwise; reset it
-  // on navigation so the logo and Collapse button are never scrolled away.
+  // The More menu closes on navigation and on Escape.
+  useEffect(() => { setMoreOpen(false); }, [location.pathname]);
   useEffect(() => {
-    if (navRef.current) navRef.current.scrollTop = 0;
-  }, [location.pathname]);
+    if (!moreOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [moreOpen]);
 
   // Header search follows navigation: on /courses it mirrors ?q= (so a
   // shared/searched link shows its query); anywhere else it clears, so a
@@ -73,18 +97,14 @@ export function Layout() {
     }
   }, [location.pathname, location.search]);
 
-  // The lesson workspace and the DSA problem page are full-height multi-panel
-  // workspaces: they take the whole content area (no max-width, no padding,
-  // no footer) and scroll each panel independently inside the viewport.
+  // Workspaces take the whole viewport: the lesson workspace, the DSA
+  // problem page and the project workspace render full-bleed — no header,
+  // no footer, no sidebar, just the workspace itself (Outlet only).
   const isWorkspace = /\/courses\/[^/]+\/lessons\//.test(location.pathname)
-    || /^\/practice\/[^/]+$/.test(location.pathname);
+    || /^\/practice\/[^/]+$/.test(location.pathname)
+    || /^\/projects\/[^/]+$/.test(location.pathname);
 
   const toggleTheme = () => applyTheme(dark ? 'light' : 'dark');
-  const toggleSidebar = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    try { localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-  };
 
   const doSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,106 +112,92 @@ export function Layout() {
     navigate(`/courses?q=${encodeURIComponent(q.trim())}`);
   };
 
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
-      collapsed ? 'justify-center px-0' : ''
-    } ${
+  const headerLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
       isActive
         ? 'bg-accent-soft font-semibold text-accent-600'
         : 'text-ink/75 hover:bg-elevated hover:text-ink'
     }`;
 
-  const renderNav = (items: NavItem[]) => items.map((n) => (
-    <NavLink key={n.to} to={n.to} end={n.to === '/'} title={collapsed ? n.label : undefined} className={navLinkClass}>
-      <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-base leading-none">{n.icon}</span>
-      {!collapsed && <span className="truncate">{n.label}</span>}
-    </NavLink>
-  ));
-
-  return (
-    // Viewport-fit shell: exactly viewport height, never scrolls itself.
-    // The sidebar and the content column each scroll their own panels.
-    <div className="flex h-dvh overflow-hidden bg-base">
-      <aside
-        aria-label="Main navigation"
-        className="hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-line bg-sidebar transition-[width] duration-200 md:flex"
-        style={{ width: collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED }}
-      >
-        <Link to="/" className={`flex items-center gap-2 py-4 text-lg font-bold ${collapsed ? 'justify-center px-0' : 'px-4'}`} title={collapsed ? 'CodeForge Academy' : undefined}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-lg text-white">⌘</span>
-          {!collapsed && <span className="min-w-0 flex-1 whitespace-normal break-words leading-tight">CodeForge <span className="text-brand-500">Academy</span></span>}
-        </Link>
-        <nav ref={navRef} className="panel-scroll min-h-0 flex-1 space-y-0.5 overflow-x-hidden px-3 py-2">
-          {renderNav(studentNav)}
-          {canAdmin && (
-            <>
-              {!collapsed && <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-faint">Administration</div>}
-              {collapsed && <div className="mx-1 my-3 border-t border-line" aria-hidden />}
-              {renderNav(adminNav)}
-            </>
-          )}
-        </nav>
-        <div className="shrink-0 border-t border-line p-3">
-          <button
-            className="btn-ghost w-full justify-start px-2 py-1.5 text-xs"
-            onClick={toggleSidebar}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <span aria-hidden className="text-base leading-none">{collapsed ? '»' : '«'}</span>
-            {!collapsed && <span>Collapse</span>}
-          </button>
-          {!collapsed && (
-            <>
-              <div className="mt-2 px-2 text-sm font-semibold">{user?.displayName}</div>
-              <div className="break-all px-2 text-xs leading-snug text-muted" title={user?.email}>{user?.email} · {user?.role}</div>
-              <div className="mt-1 px-2 text-[11px] text-faint">v{APP_VERSION}</div>
-            </>
-          )}
-          {collapsed && (
-            <div className="mt-2 flex justify-center" title={`${user?.displayName ?? ''} · ${user?.email ?? ''}`}>
-              <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-elevated text-sm font-bold text-accent-600">
-                {(user?.displayName ?? '?').charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-          <button className="btn-ghost mt-2 w-full justify-start" onClick={async () => { await logout(); toast('Signed out', 'success'); navigate('/login'); }}>
-            <span aria-hidden className="text-base leading-none">↩</span>
-            {!collapsed && <span>Sign out</span>}
-          </button>
-        </div>
-      </aside>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex shrink-0 items-center gap-3 border-b border-line bg-base/90 px-4 py-3 backdrop-blur">
-          <Link to="/" className="text-lg font-bold md:hidden">CodeForge <span className="text-brand-500">Academy</span></Link>
-          <form onSubmit={doSearch} className="hidden flex-1 sm:block">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses, lessons, DSA problems, projects…"
-              className="input max-w-md" aria-label="Search" />
-          </form>
-          <div className="ml-auto flex items-center gap-2">
-            <button className="btn-secondary" onClick={toggleTheme} aria-label="Toggle theme">{dark ? '☀ Light' : '☾ Dark'}</button>
-            <Link to="/profile" className="btn-secondary">Profile</Link>
-          </div>
-        </header>
-        <main
-          className={
-            isWorkspace
-              ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
-              // Standard pages: this main is the page's own scroll panel.
-              : 'panel-scroll min-h-0 min-w-0 flex-1'
-          }
-        >
-          <div className={isWorkspace ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'mx-auto w-full max-w-6xl px-4 py-6'}>
+  if (isWorkspace) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-base">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <Outlet />
           </div>
         </main>
-        {!isWorkspace && (
-          <footer className="shrink-0 break-words border-t border-line px-4 py-3 text-center text-xs text-muted">
-            CodeForge Academy — runs locally. Your code executes on this machine; runtimes are detected, never faked.
-          </footer>
-        )}
       </div>
+    );
+  }
+
+  return (
+    // Viewport-fit shell: exactly viewport height, never scrolls itself.
+    // The content column is the page's own scroll panel.
+    <div className="flex h-dvh flex-col overflow-hidden bg-base">
+      <header className="sticky top-0 z-40 flex shrink-0 items-center gap-3 border-b border-line bg-base/90 px-4 py-3 backdrop-blur">
+        <Link to="/" className="flex shrink-0 items-center gap-2 text-lg font-bold">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500 text-lg text-white">⌘</span>
+          <span className="hidden lg:inline">CodeForge <span className="text-brand-500">Academy</span></span>
+        </Link>
+        <nav aria-label="Main navigation" className="panel-scroll-x flex min-w-0 flex-1 items-center gap-0.5">
+          {headerNav.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.to === '/'} className={headerLinkClass}>{n.label}</NavLink>
+          ))}
+          {canAdmin && <NavLink to="/admin" className={headerLinkClass}>Admin</NavLink>}
+        </nav>
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-haspopup="true"
+            className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-ink/75 transition-colors duration-200 hover:bg-elevated hover:text-ink"
+          >
+            More ▾
+          </button>
+          {moreOpen && (
+            <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-line bg-surface p-1 shadow-lg" role="menu" aria-label="More sections">
+              {moreNav.map((n) => (
+                <Link key={n.to} to={n.to} onClick={() => setMoreOpen(false)} role="menuitem"
+                  className="block rounded-md px-3 py-2 text-sm text-ink/85 hover:bg-elevated hover:text-ink">
+                  {n.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        <form onSubmit={doSearch} className="hidden shrink-0 sm:block">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses…"
+            className="input !w-52 lg:!w-64" aria-label="Search" />
+        </form>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button className="btn-secondary" onClick={toggleTheme} aria-label="Toggle theme">{dark ? '☀ Light' : '☾ Dark'}</button>
+          <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-full bg-elevated text-sm font-bold text-accent-600" title={`${user?.displayName ?? ''} · ${user?.email ?? ''}`} aria-label="Profile">
+            {(user?.displayName ?? '?').charAt(0).toUpperCase()}
+          </Link>
+          <button className="btn-ghost px-2" onClick={async () => { await logout(); toast('Signed out', 'success'); navigate('/login'); }} aria-label="Sign out" title="Sign out">
+            <span aria-hidden className="text-base leading-none">↩</span>
+          </button>
+        </div>
+      </header>
+      <main className="panel-scroll min-h-0 min-w-0 flex-1">
+        <div className="mx-auto w-full max-w-[1100px] px-4 py-6">
+          <Outlet />
+        </div>
+      </main>
+      <footer className="shrink-0 border-t border-line px-4 py-3 text-center text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link className="hover:text-ink" to="/docs">Docs</Link>
+          <Link className="hover:text-ink" to="/cheatsheets">Cheatsheets</Link>
+          <Link className="hover:text-ink" to="/achievements">Achievements</Link>
+          <Link className="hover:text-ink" to="/progress">Progress</Link>
+          <Link className="hover:text-ink" to="/settings">Settings</Link>
+        </div>
+        <p className="mt-1">
+          CodeForge Academy v{APP_VERSION} — runs locally. Your code executes on this machine; runtimes are detected, never faked.
+        </p>
+      </footer>
     </div>
   );
 }

@@ -83,14 +83,21 @@ export const projectsRouter = Router();
 projectsRouter.get('/', requireAuth, (req: AuthedRequest, res) => {
   const conn = db();
   const { level } = req.query;
-  let sql = 'SELECT id, slug, level, title, description, skills, language FROM projects WHERE 1=1';
+  let sql = 'SELECT id, slug, level, title, description, skills, language, content FROM projects WHERE 1=1';
   const params: unknown[] = [];
   if (level) { sql += ' AND level = ?'; params.push(Number(level)); }
   sql += ' ORDER BY level, title';
-  const projects = (conn.prepare(sql).all(...params) as Record<string, unknown>[]).map((p) => ({
-    ...p, skills: parseJson(String(p.skills), []),
-    progress: conn.prepare('SELECT status, completed_milestones FROM user_project_progress WHERE user_id = ? AND project_id = ?').get(req.user!.id, p.id) as { status: string; completed_milestones: string } | undefined,
-  }));
+  const projects = (conn.prepare(sql).all(...params) as Record<string, unknown>[]).map((p) => {
+    // `content` holds the seeded project JSON (minus milestones); the
+    // `portfolio` flag lives there when the curriculum sets it. It is
+    // exposed as a plain boolean and never spread into the response.
+    const { content, ...rest } = p;
+    return {
+      ...rest, skills: parseJson(String(p.skills), []),
+      portfolio: (parseJson(String(content ?? '{}'), {}) as { portfolio?: unknown }).portfolio === true,
+      progress: conn.prepare('SELECT status, completed_milestones FROM user_project_progress WHERE user_id = ? AND project_id = ?').get(req.user!.id, p.id) as { status: string; completed_milestones: string } | undefined,
+    };
+  });
   res.json({ projects });
 });
 

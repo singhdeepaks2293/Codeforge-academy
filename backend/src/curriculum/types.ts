@@ -173,4 +173,6 @@ export interface Project {
   milestones: ProjectMilestone[];
   reviewChecklist: string[];
   finalAssessment: string[];
+  /** True for the Codecademy-style portfolio projects (portfolio section). */
+  portfolio?: boolean;
 }

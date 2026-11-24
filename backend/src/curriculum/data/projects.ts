@@ -2786,7 +2786,7 @@ export const PROJECTS: Project[] = [
     ]
   },
   {
-    "id": "proj-library-management",
+    "id": "proj-library-management-python",
     "slug": "library-management-system",
     "level": 2,
     "title": "Library Management System",
@@ -2836,7 +2836,7 @@ export const PROJECTS: Project[] = [
     ],
     "milestones": [
       {
-        "id": "proj-library-management-m1",
+        "id": "proj-library-management-python-m1",
         "order": 1,
         "title": "Schema and setup",
         "objectives": [
@@ -2867,7 +2867,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-library-management-m2",
+        "id": "proj-library-management-python-m2",
         "order": 2,
         "title": "Books and members",
         "objectives": [
@@ -2898,7 +2898,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-library-management-m3",
+        "id": "proj-library-management-python-m3",
         "order": 3,
         "title": "Borrowing and returning",
         "objectives": [
@@ -2929,7 +2929,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-library-management-m4",
+        "id": "proj-library-management-python-m4",
         "order": 4,
         "title": "Fines",
         "objectives": [
@@ -2960,7 +2960,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-library-management-m5",
+        "id": "proj-library-management-python-m5",
         "order": 5,
         "title": "Reservations and reports",
         "objectives": [
@@ -2991,7 +2991,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-library-management-m6",
+        "id": "proj-library-management-python-m6",
         "order": 6,
         "title": "Testing and polish",
         "objectives": [
@@ -3039,8 +3039,8 @@ export const PROJECTS: Project[] = [
     ]
   },
   {
-    "id": "proj-inventory-system",
-    "slug": "inventory-system",
+    "id": "proj-inventory-system-basic",
+    "slug": "inventory-system-basic",
     "level": 2,
     "title": "Inventory System",
     "description": "Build an inventory system for a small shop that tracks products, stock levels, suppliers and purchase orders. It warns on low stock, records stock movements, and reports inventory value and fast-moving products.",
@@ -3089,7 +3089,7 @@ export const PROJECTS: Project[] = [
     ],
     "milestones": [
       {
-        "id": "proj-inventory-system-m1",
+        "id": "proj-inventory-system-basic-m1",
         "order": 1,
         "title": "Schema and products",
         "objectives": [
@@ -3120,7 +3120,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-inventory-system-m2",
+        "id": "proj-inventory-system-basic-m2",
         "order": 2,
         "title": "Stock movements and audit",
         "objectives": [
@@ -3151,7 +3151,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-inventory-system-m3",
+        "id": "proj-inventory-system-basic-m3",
         "order": 3,
         "title": "Low-stock warnings and suppliers",
         "objectives": [
@@ -3182,7 +3182,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-inventory-system-m4",
+        "id": "proj-inventory-system-basic-m4",
         "order": 4,
         "title": "Purchase orders",
         "objectives": [
@@ -3213,7 +3213,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-inventory-system-m5",
+        "id": "proj-inventory-system-basic-m5",
         "order": 5,
         "title": "Reports and CSV import",
         "objectives": [
@@ -3244,7 +3244,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-inventory-system-m6",
+        "id": "proj-inventory-system-basic-m6",
         "order": 6,
         "title": "Testing and polish",
         "objectives": [
@@ -4557,8 +4557,8 @@ export const PROJECTS: Project[] = [
     ]
   },
   {
-    "id": "proj-url-shortener",
-    "slug": "url-shortener",
+    "id": "proj-url-shortener-express",
+    "slug": "url-shortener-express",
     "level": 2,
     "title": "URL Shortener",
     "description": "Build a URL shortener service with an Express backend and SQLite: create short links, redirect visitors, track click counts, support custom aliases and expiry, and show statistics per link.",
@@ -4607,7 +4607,7 @@ export const PROJECTS: Project[] = [
     ],
     "milestones": [
       {
-        "id": "proj-url-shortener-m1",
+        "id": "proj-url-shortener-express-m1",
         "order": 1,
         "title": "Setup and schema",
         "objectives": [
@@ -4638,7 +4638,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-url-shortener-m2",
+        "id": "proj-url-shortener-express-m2",
         "order": 2,
         "title": "Link creation",
         "objectives": [
@@ -4669,7 +4669,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-url-shortener-m3",
+        "id": "proj-url-shortener-express-m3",
         "order": 3,
         "title": "Redirect and clicks",
         "objectives": [
@@ -4700,7 +4700,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-url-shortener-m4",
+        "id": "proj-url-shortener-express-m4",
         "order": 4,
         "title": "Aliases and expiry",
         "objectives": [
@@ -4731,7 +4731,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-url-shortener-m5",
+        "id": "proj-url-shortener-express-m5",
         "order": 5,
         "title": "Statistics and listing",
         "objectives": [
@@ -4762,7 +4762,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-url-shortener-m6",
+        "id": "proj-url-shortener-express-m6",
         "order": 6,
         "title": "Testing and polish",
         "objectives": [
@@ -6008,7 +6008,7 @@ export const PROJECTS: Project[] = [
     ]
   },
   {
-    "id": "proj-realtime-chat",
+    "id": "proj-realtime-chat-react",
     "slug": "real-time-chat",
     "level": 3,
     "title": "Real-Time Chat",
@@ -6058,7 +6058,7 @@ export const PROJECTS: Project[] = [
     ],
     "milestones": [
       {
-        "id": "proj-realtime-chat-m1",
+        "id": "proj-realtime-chat-react-m1",
         "order": 1,
         "title": "Setup, schema and auth",
         "objectives": [
@@ -6089,7 +6089,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m2",
+        "id": "proj-realtime-chat-react-m2",
         "order": 2,
         "title": "Rooms over REST",
         "objectives": [
@@ -6120,7 +6120,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m3",
+        "id": "proj-realtime-chat-react-m3",
         "order": 3,
         "title": "WebSocket server",
         "objectives": [
@@ -6151,7 +6151,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m4",
+        "id": "proj-realtime-chat-react-m4",
         "order": 4,
         "title": "Real-time messaging",
         "objectives": [
@@ -6182,7 +6182,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m5",
+        "id": "proj-realtime-chat-react-m5",
         "order": 5,
         "title": "Typing indicators and presence",
         "objectives": [
@@ -6213,7 +6213,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m6",
+        "id": "proj-realtime-chat-react-m6",
         "order": 6,
         "title": "React chat UI",
         "objectives": [
@@ -6244,7 +6244,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m7",
+        "id": "proj-realtime-chat-react-m7",
         "order": 7,
         "title": "Direct messages and edits",
         "objectives": [
@@ -6275,7 +6275,7 @@ export const PROJECTS: Project[] = [
         ]
       },
       {
-        "id": "proj-realtime-chat-m8",
+        "id": "proj-realtime-chat-react-m8",
         "order": 8,
         "title": "Testing and documentation",
         "objectives": [

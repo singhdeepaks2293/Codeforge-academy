@@ -1,0 +1,32 @@
+/* Workspace-specific styles for WorkspaceShell (slide-over drawers and the
+   black terminal column's scrollbar). No global/theme rules live here. */
+
+@keyframes workspace-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes workspace-slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.workspace-drawer-right {
+  animation: workspace-slide-in-right 180ms ease-out;
+}
+
+.workspace-drawer-left {
+  animation: workspace-slide-in-left 180ms ease-out;
+}
+
+/* Thin light scrollbar on the black terminal column. */
+.workspace-terminal-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.workspace-terminal-scroll::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.25);
+  border-radius: 8px;
+}
+.workspace-terminal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

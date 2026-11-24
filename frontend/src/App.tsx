@@ -6,7 +6,10 @@ import { ToastProvider } from './components/Toast';
 import { Layout } from './components/Layout';
 import { SetupPage, LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage, NotFoundPage } from './pages/AuthPages';
 import { DashboardPage } from './pages/Dashboard';
-import { CoursesPage, CourseDetailPage, MyLearningPage, PathsPage } from './pages/Courses';
+import { CoursesPage, CourseDetailPage, MyLearningPage } from './pages/Courses';
+import { DocsPage } from './pages/Docs';
+import { CheatsheetsPage } from './pages/Cheatsheets';
+import { SkillPathsPage, CareerPathsPage, CertificatesPage, VerifyCertificatePage, QuizzesPage, ChallengesPage, InterviewPage, BootcampsPage, CoachPage, BuilderPage } from './pages/Features';
 import { LessonWorkspacePage } from './pages/LessonWorkspace';
 import { DsaListPage, DsaProblemPage } from './pages/Dsa';
 import { ProjectsPage, ProjectDetailPage } from './pages/Projects';
@@ -48,7 +51,19 @@ export default function App() {
               <Route path="/courses/:slug" element={<CourseDetailPage />} />
               <Route path="/courses/:slug/lessons/:lessonId" element={<LessonWorkspacePage />} />
               <Route path="/my-learning" element={<MyLearningPage />} />
-              <Route path="/paths" element={<PathsPage />} />
+              <Route path="/paths" element={<SkillPathsPage />} />
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="/cheatsheets" element={<CheatsheetsPage />} />
+              <Route path="/features/skill-paths" element={<SkillPathsPage />} />
+              <Route path="/features/careers" element={<CareerPathsPage />} />
+              <Route path="/features/certificates" element={<CertificatesPage />} />
+              <Route path="/features/certificates/:code" element={<VerifyCertificatePage />} />
+              <Route path="/features/quizzes" element={<QuizzesPage />} />
+              <Route path="/features/challenges" element={<ChallengesPage />} />
+              <Route path="/features/interview" element={<InterviewPage />} />
+              <Route path="/features/bootcamps" element={<BootcampsPage />} />
+              <Route path="/features/coach" element={<CoachPage />} />
+              <Route path="/features/builder" element={<BuilderPage />} />
               <Route path="/practice" element={<DsaListPage />} />
               <Route path="/practice/:slug" element={<DsaProblemPage />} />
               <Route path="/projects" element={<ProjectsPage />} />

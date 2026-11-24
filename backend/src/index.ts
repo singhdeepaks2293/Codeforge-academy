@@ -14,6 +14,7 @@ import { adminRouter } from './routes/admin.js';
 import { provisioningRouter, runtimesHandler } from './routes/provisioning.js';
 import { restoreProvisionedPaths } from './services/provisioning.js';
 import { dsaRouter, projectsRouter, assessmentsRouter, progressRouter } from './routes/learn.js';
+import { featuresRouter } from './routes/features.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -39,6 +40,7 @@ app.use('/api/dsa', dsaRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/assessments', assessmentsRouter);
 app.use('/api/progress', progressRouter);
+app.use('/api/features', featuresRouter);
 
 // Serve the built frontend in production
 // Resolved from this file's location, not the working directory, so the

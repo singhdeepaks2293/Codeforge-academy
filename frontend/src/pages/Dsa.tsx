@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, langToEditor } from '../lib/api';
 import { useToast } from '../components/Toast';
-import { Page } from '../components/Layout';
+import { IndexLayout, Page } from '../components/Layout';
 import { Collapsible } from '../components/Collapsible';
 import { CodeEditor } from '../components/MonacoEditor';
 import { Visualization, HOW_TO_READ_TEXT } from '../components/Visualizations';
@@ -101,29 +101,47 @@ export function DsaListPage() {
           {VIZ_KINDS.map((k) => <Visualization key={k} kind={k} />)}
         </div>
       </Collapsible>
-      {/* Filters: one row, never stacked full-width. */}
-      <div className="panel-scroll-x mb-4 flex flex-nowrap items-center gap-2">
-        <input className="input min-w-0 flex-1" placeholder="Search problems…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search problems" />
-        <select className="input !w-auto shrink-0" value={difficulty} onChange={(e) => setDifficulty(e.target.value)} aria-label="Filter by difficulty">
-          <option value="">All difficulties</option><option>Easy</option><option>Medium</option><option>Hard</option>
-        </select>
-        <select className="input !w-auto shrink-0" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Filter by topic">
-          <option value="">All topics</option>
-          {topics.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-      {filtered.length === 0 && <div className="card p-6 text-center text-muted">No problems match your filters.</div>}
-      <div className="space-y-2">
-        {filtered.map((p) => (
-          <Link key={p.id} to={`/practice/${p.slug}`} className="card flex items-center justify-between gap-3 p-4 hover:shadow-md">
-            <div className="min-w-0">
-              <span className="font-semibold">{p.solved ? '✓ ' : ''}{p.title}</span>
-              <div className="mt-1 flex flex-wrap gap-1">{p.topics.map((t) => <span key={t} className="badge bg-elevated text-muted">{t}</span>)}</div>
+      <IndexLayout
+        rail={(
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-sm font-bold">Filters</h2>
+              <p className="text-sm text-muted">{filtered.length} of {problems.length} problems · {solved} solved</p>
             </div>
-            <span className={`badge shrink-0 ${p.difficulty === 'Easy' ? 'bg-success-soft text-success' : p.difficulty === 'Medium' ? 'bg-warning-soft text-warning' : 'bg-danger-soft text-danger'}`}>{p.difficulty}</span>
-          </Link>
-        ))}
-      </div>
+            <div>
+              <label className="label" htmlFor="dsa-difficulty">Difficulty</label>
+              <select id="dsa-difficulty" className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value)} aria-label="Filter by difficulty">
+                <option value="">All difficulties</option><option>Easy</option><option>Medium</option><option>Hard</option>
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="dsa-topic">Topic</label>
+              <select id="dsa-topic" className="input" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Filter by topic">
+                <option value="">All topics</option>
+                {topics.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {(difficulty || topic) && <button className="btn-ghost text-xs" onClick={() => { setDifficulty(''); setTopic(''); }}>Clear filters</button>}
+          </div>
+        )}
+      >
+        {/* Search stays in the content column, one row, never stacked full-width. */}
+        <div className="mb-4">
+          <input className="input" placeholder="Search problems…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search problems" />
+        </div>
+        {filtered.length === 0 && <div className="card p-6 text-center text-muted">No problems match your filters.</div>}
+        <div className="space-y-2">
+          {filtered.map((p) => (
+            <Link key={p.id} to={`/practice/${p.slug}`} className="card flex items-center justify-between gap-3 p-4 hover:shadow-md">
+              <div className="min-w-0">
+                <span className="font-semibold">{p.solved ? '✓ ' : ''}{p.title}</span>
+                <div className="mt-1 flex flex-wrap gap-1">{p.topics.map((t) => <span key={t} className="badge bg-elevated text-muted">{t}</span>)}</div>
+              </div>
+              <span className={`badge shrink-0 ${p.difficulty === 'Easy' ? 'bg-success-soft text-success' : p.difficulty === 'Medium' ? 'bg-warning-soft text-warning' : 'bg-danger-soft text-danger'}`}>{p.difficulty}</span>
+            </Link>
+          ))}
+        </div>
+      </IndexLayout>
     </Page>
   );
 }

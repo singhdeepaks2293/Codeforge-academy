@@ -17,13 +17,17 @@ vi.mock('../context/AuthContext', () => ({
   useCan: () => false,
 }));
 
-function renderLayout() {
+function renderLayout(initialEntries: string[] = ['/']) {
   return render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={initialEntries}>
       <ToastProvider>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<div>Dashboard content</div>} />
+            <Route path="courses" element={<div>Courses content</div>} />
+            <Route path="courses/:slug/lessons/:lessonId" element={<div>Lesson workspace</div>} />
+            <Route path="practice/:slug" element={<div>DSA workspace</div>} />
+            <Route path="projects/:slug" element={<div>Project workspace</div>} />
           </Route>
         </Routes>
       </ToastProvider>
@@ -31,35 +35,71 @@ function renderLayout() {
   );
 }
 
-describe('Layout sidebar', () => {
+describe('Layout top header nav (no sidebar)', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
   });
 
-  it('starts collapsed to the ~68px icon rail with no saved preference', () => {
+  it('has no persistent left sidebar', () => {
     renderLayout();
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '68px' });
-    expect(screen.queryByText('Explore Courses')).not.toBeInTheDocument();
-    expect(screen.getByTitle('Explore Courses')).toBeInTheDocument();
+    // The header <nav> is the only navigation; there is no <aside> at all.
+    expect(document.querySelector('aside')).toBeNull();
+    expect(screen.queryByLabelText('Expand sidebar')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Collapse sidebar')).not.toBeInTheDocument();
+    expect(localStorage.getItem('cf-sidebar-collapsed')).toBeNull();
   });
 
-  it('expands to ~210px labelled and persists the preference', () => {
+  it('shows the header nav links: Catalog, My Home, Paths, Practice, Projects, Assessments', () => {
     renderLayout();
-    fireEvent.click(screen.getByLabelText('Expand sidebar'));
-    const aside = screen.getByLabelText('Main navigation');
-    expect(aside).toHaveStyle({ width: '210px' });
-    expect(localStorage.getItem('cf-sidebar-collapsed')).toBe('0');
-    expect(screen.getByText('Explore Courses')).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(nav).toBeInTheDocument();
+    for (const [label, href] of [
+      ['Catalog', '/courses'], ['My Home', '/'], ['Paths', '/paths'],
+      ['Practice', '/practice'], ['Projects', '/projects'], ['Assessments', '/assessments'],
+    ] as const) {
+      const link = screen.getByRole('link', { name: label });
+      expect(link).toBeInTheDocument();
+      expect(link.getAttribute('href')).toBe(href);
+    }
   });
 
-  it('restores a persisted expanded sidebar on load', () => {
-    localStorage.setItem('cf-sidebar-collapsed', '0');
+  it('shows the version in the footer on standard pages', () => {
     renderLayout();
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '210px' });
-    fireEvent.click(screen.getByLabelText('Collapse sidebar'));
-    expect(screen.getByLabelText('Main navigation')).toHaveStyle({ width: '68px' });
-    expect(localStorage.getItem('cf-sidebar-collapsed')).toBe('1');
+    expect(screen.getByText(/CodeForge Academy v1\.1\.0/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs');
+    expect(screen.getByRole('link', { name: 'Cheatsheets' })).toHaveAttribute('href', '/cheatsheets');
+  });
+
+  it('shows the avatar linking to the profile', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
+  });
+});
+
+describe('Layout workspace routes render full-bleed', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+  });
+
+  it.each([
+    ['/courses/python/lessons/lesson-1', 'Lesson workspace'],
+    ['/practice/two-sum', 'DSA workspace'],
+    ['/projects/cli-calculator', 'Project workspace'],
+  ])('renders %s with no header, footer or nav', (path, content) => {
+    renderLayout([path]);
+    expect(screen.getByText(content)).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).toBeNull();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).toBeNull();
+  });
+
+  it('keeps the header and footer on a standard page', () => {
+    renderLayout(['/courses']);
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    expect(screen.getByText('Courses content')).toBeInTheDocument();
   });
 });
 
@@ -76,30 +116,28 @@ describe('Layout viewport-fit shell', () => {
     expect(shell.className).toContain('overflow-hidden');
   });
 
-  it('gives the main content its own scroll panel', () => {
+  it('gives the main content its own scroll panel and centres it at ~1100px', () => {
     const { container } = renderLayout();
     const main = container.querySelector('main') as HTMLElement;
     expect(main.className).toContain('panel-scroll');
     expect(main.className).toContain('min-h-0');
+    const inner = main.firstChild as HTMLElement;
+    expect(inner.className).toContain('max-w-[1100px]');
+  });
+});
+
+describe('Layout header search', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
   });
 
-  it('resets the sidebar scroll position on navigation', () => {
-    const { container } = render(
-      <MemoryRouter initialEntries={['/']}>
-        <ToastProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<div>Dashboard content</div>} />
-              <Route path="profile" element={<div>Profile content</div>} />
-            </Route>
-          </Routes>
-        </ToastProvider>
-      </MemoryRouter>,
-    );
-    const nav = container.querySelector('nav') as HTMLElement;
-    nav.scrollTop = 120;
-    fireEvent.click(screen.getByTitle('Profile'));
-    expect(nav.scrollTop).toBe(0);
+  it('mirrors ?q= on /courses and clears on navigation away', () => {
+    renderLayout(['/courses?q=python']);
+    const search = screen.getByLabelText('Search') as HTMLInputElement;
+    expect(search.value).toBe('python');
+    fireEvent.click(screen.getByRole('link', { name: 'My Home' }));
+    expect((screen.getByLabelText('Search') as HTMLInputElement).value).toBe('');
   });
 });
 
