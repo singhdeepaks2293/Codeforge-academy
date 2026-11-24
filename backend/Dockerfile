@@ -22,23 +22,36 @@
 #   git, ansible (DevOps tool tracks), terraform (official release zip),
 #   docker CLI only (official static bundle — client binary, NO daemon;
 #   the CLI talks to the HOST daemon, so the containerised backend needs
-#   the host docker socket mounted for Docker exercises, see docs/DOCKER.md).
+#   the host docker socket mounted for Docker exercises, see docs/DOCKER.md),
+#   python3-pip + pip (network-automation Python libraries): jinja2, pyyaml,
+#   textfsm, netmiko, nornir, napalm, ncclient, paramiko, pynetbox, requests,
+#   xmltodict, pyats; and AI-build Python libraries: numpy, CPU-only torch
+#   (from the PyTorch CPU index — the default PyPI wheel is the CUDA
+#   bundle), mcp (Python MCP SDK 2.x), pytest, uv.
 # Auto-installable on local/dev hosts only (NOT in this image):
 #   C# (.NET SDK via dotnet-install), Dart (official SDK zip),
 #   Julia (official tarball), Terraform (official zip). See the provisioning service.
 # Manual-only everywhere (no unattended install exists):
 #   Swift (platform-specific ~700 MB toolchains), Objective-C (Xcode/GNUstep),
 #   MongoDB / Redis (services, not code runners — those tracks are quiz-style),
-#   Docker Engine daemon (the image ships only the CLI; the daemon is host-side).
+#   Docker Engine daemon (the image ships only the CLI; the daemon is host-side),
+#   Batfish (needs a Java server process; its lessons are validation-style,
+#   not live queries against a running Batfish server).
 # Built-in (no install ever needed): SQL (node:sqlite), HTML (static check).
 # Node.js itself (TS/JS/React) is the base image.
 #
 # Size note: the apt set adds roughly 1.0–1.3 GB over the previous image,
 # dominated by ghc (~650 MB), rustc/cargo + LLVM (~200 MB) and R (~150 MB
-# with dependencies). That is the deliberate cost of covering every track
-# in the image; the sizes are estimates from the packages' Installed-Size
-# fields and have NOT been measured from a real `docker build` here
-# (no Docker in the build sandbox — see docs/DOCKER.md).
+# with dependencies), plus ~215 MB for the pip-installed network-automation
+# Python libraries (netmiko, nornir, napalm, ncclient, pyATS, etc. — the
+# pip layer was measured at ~213 MB in the build sandbox), plus ~805 MB
+# installed for CPU-only torch (210 MB download; the tiny GPT trains in
+# ~136 s on shared CPU in the build sandbox) and ~10 MB for mcp + pytest
+# + numpy + uv. That is the
+# deliberate cost of covering every track in the image; the sizes are
+# estimates from the packages' Installed-Size fields and have NOT been
+# measured from a real `docker build` here (no Docker in the build
+# sandbox — see docs/DOCKER.md).
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
@@ -56,13 +69,29 @@ ENV NODE_ENV=production
 # official downloads below (no apt package).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    python3 gcc g++ build-essential golang-go default-jre-headless perl tini \
+    python3 python3-pip gcc g++ build-essential golang-go default-jre-headless perl tini \
     ca-certificates curl unzip git ansible \
     rustc cargo php-cli ruby lua5.4 elixir r-base-core ghc scala \
   && rm -rf /var/lib/apt/lists/* \
   && ln -sf /usr/bin/lua5.4 /usr/local/bin/lua \
   && mkdir -p /app/data /app/dist \
   && chown -R node:node /app
+# Network-automation Python libraries (pip — no apt packages on bookworm):
+# jinja2, pyyaml, textfsm, netmiko, nornir, napalm, ncclient, paramiko,
+# pynetbox, requests, xmltodict, pyats. Installed as root here, before
+# USER node; the executor runs `python3 -I`, which still sees system
+# site-packages, so netauto exercises run for real in the image.
+RUN pip3 install --break-system-packages \
+    jinja2 pyyaml textfsm netmiko nornir napalm ncclient paramiko pynetbox requests xmltodict pyats
+# AI-build Python libraries: CPU-only torch for the build-your-own-GPT
+# project (from the PyTorch CPU index — the default PyPI wheel is the CUDA
+# bundle), plus the MCP Python SDK, pytest, numpy and uv for the MCP/evals
+# projects. Installed as root here, before USER node; the executor runs
+# `python3 -I`, which still sees system site-packages, so the AI-build
+# projects run for real in the image. (mcp 2.x: the server class is
+# MCPServer from mcp.server.mcpserver — older guides call it FastMCP.)
+RUN pip3 install --break-system-packages --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
+  && pip3 install --break-system-packages --no-cache-dir mcp pytest numpy uv
 # Solidity: official static binary (no apt package on bookworm).
 RUN curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.26/solc-static-linux \
     -o /usr/local/bin/solc \

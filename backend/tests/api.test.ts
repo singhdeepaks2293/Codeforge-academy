@@ -220,12 +220,12 @@ describe('code execution (real)', () => {
 });
 
 describe('700-track catalog + new executors', () => {
-  it('catalog has 793 courses and 8284 lessons across 7 categories', async () => {
+  it('catalog has 863 courses and 8984 lessons across 7 categories', async () => {
     const { res, json } = await req('/api/courses');
     expect(res.status).toBe(200);
     const courses = json?.courses as { slug: string; totalLessons: number; category?: string; language?: string }[];
-    expect(courses.length).toBe(793);
-    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(8284);
+    expect(courses.length).toBe(863); // 793 phase-2 + 70 network-automation tracks
+    expect(courses.reduce((n, c) => n + (c.totalLessons || 0), 0)).toBe(8984); // 8284 + 700
     const cats = new Set(courses.map((c) => c.category));
     expect([...cats].sort()).toEqual(['cs-career', 'data-ai', 'databases', 'devops', 'languages', 'mobile', 'web']);
     const dataAi = await req('/api/courses?category=data-ai');
@@ -234,13 +234,15 @@ describe('700-track catalog + new executors', () => {
     expect(dataCourses.every((c) => c.category === 'data-ai')).toBe(true);
     const devops = await req('/api/courses?category=devops');
     const devopsCourses = (devops.json?.courses || []) as { category?: string; language?: string }[];
-    expect(devopsCourses.length).toBe(54); // 14 existing + 40 new DevOps tool tracks
+    expect(devopsCourses.length).toBe(124); // 14 existing + 40 DevOps tool tracks + 70 network-automation tracks
     expect(devopsCourses.every((c) => c.category === 'devops')).toBe(true);
-    for (const tool of ['ansible', 'terraform', 'docker', 'git']) {
-      expect(devopsCourses.filter((c) => c.language === tool).length).toBe(10);
+    // Network automation adds 20 ansible-language tracks (ansible + firewall areas)
+    // and 50 python-language tracks (python/apis/sot/testing/protocols areas).
+    for (const [tool, n] of [['ansible', 30], ['terraform', 10], ['docker', 10], ['git', 10]] as const) {
+      expect(devopsCourses.filter((c) => c.language === tool).length).toBe(n);
     }
-    for (const lang of ['c', 'cpp', 'python', 'typescript', 'react', 'rust', 'go']) {
-      expect(courses.filter((c) => c.language === lang).length).toBe(100);
+    for (const [lang, n] of [['c', 100], ['cpp', 100], ['python', 150], ['typescript', 100], ['react', 100], ['rust', 100], ['go', 100]] as const) {
+      expect(courses.filter((c) => c.language === lang).length).toBe(n);
     }
     const py = courses.find((c) => c.slug === 'python');
     expect(py?.totalLessons).toBe(54); // v1 track untouched

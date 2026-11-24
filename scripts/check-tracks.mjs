@@ -148,15 +148,20 @@ console.log(`Errors: ${errors}  Warnings: ${warnings}`);
 if (!skipTotals) {
   // Final totals: 100 existing tracks + 653 new language tracks (98 C,
   // 99 C++, 62 Python, 97 TypeScript, 99 React, 99 Rust, 99 Go) + 40 new
-  // DevOps tool tracks (10 each Ansible/Terraform/Docker/Git) = 793
+  // DevOps tool tracks (10 each Ansible/Terraform/Docker/Git) + 70 new
+  // Network Automation tracks (10 each in 7 areas) = 863
   // courses; every new track has exactly 10 lessons
-  // => 1354 + 6530 + 400 = 8284 lessons/exercises.
-  if (courses.length !== 793) err(`TOTAL courses ${courses.length} != 793`);
-  if (lessons !== 8284) err(`TOTAL lessons ${lessons} != 8284`);
-  if (exercises !== 8284) err(`TOTAL exercises ${exercises} != 8284`);
-  for (const lang of ['c', 'cpp', 'python', 'typescript', 'react', 'rust', 'go']) {
+  // => 1354 + 6530 + 400 + 700 = 8984 lessons/exercises.
+  if (courses.length !== 863) err(`TOTAL courses ${courses.length} != 863`);
+  if (lessons !== 8984) err(`TOTAL lessons ${lessons} != 8984`);
+  if (exercises !== 8984) err(`TOTAL exercises ${exercises} != 8984`);
+  // Core languages stay at exactly 100 tracks each — except python, which
+  // also carries the 50 Python-language Network Automation tracks
+  // (5 areas x 10), so python is 150.
+  for (const lang of ['c', 'cpp', 'typescript', 'react', 'rust', 'go']) {
     if ((perLang[lang] || 0) !== 100) err(`language ${lang} has ${perLang[lang] || 0} tracks (need exactly 100)`);
   }
+  if ((perLang['python'] || 0) !== 150) err(`language python has ${perLang['python'] || 0} tracks (need exactly 150)`);
 } else {
   console.log('(totals skipped: --skip-totals)');
 }

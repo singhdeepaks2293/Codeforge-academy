@@ -59,7 +59,10 @@ Every language used by the tracks, DSA and projects has a defined provisioning p
 
 | Language / track | Runtime | Docker image | Local/dev host | Notes |
 |---|---|---|---|---|
-| Python 3 | `python3` | **Baked** (`python3`) | present | |
+| Python 3 | `python3` | **Baked** (`python3`) | present | Network-automation libraries baked via pip (see row below): jinja2, pyyaml, textfsm, netmiko, nornir, napalm, ncclient, paramiko, pynetbox, requests, xmltodict, pyats |
+| Network automation (Python libs) | `python3` | **Baked** (pip in the image) | `pip install jinja2 pyyaml textfsm netmiko nornir napalm ncclient paramiko pynetbox requests xmltodict pyats` | Used by the network-automation tracks' Python exercises (templating, parsing, NETCONF/RESTCONF clients, Nornir/NAPALM/pyATS). The executor runs `python3 -I`, which still sees system site-packages, so these import for real |
+| AI builds (Python libs) | `python3` | **Baked** (pip in the image) | `pip install torch --index-url https://download.pytorch.org/whl/cpu` then `pip install mcp pytest numpy uv` | Used by the five AI-build projects: CPU-only torch for the build-your-own-GPT project (the default PyPI wheel is the CUDA bundle — the CPU index is required), MCP Python SDK 2.x + pytest + uv for the MCP/evals projects, numpy for RAG/GPT. Verified in the build sandbox: torch 2.15.0+cpu, ~210 MB download / ~805 MB installed, tiny GPT (410k params, 300 steps) trains in ~136 s on shared CPU. The executor runs `python3 -I`, which still sees system site-packages. On PEP 668 systems use a venv — `pip install --user` is invisible under `python3 -I` |
+| Batfish | — | Not in image | **Manual only** | Needs a Java server process — see "Batfish is manual-only" below. Batfish lessons are validation-style (offline config analysis), never live queries faked as a running server |
 | C / Assembly | `gcc` | **Baked** (`gcc`, `build-essential`) | apt/dnf/brew/choco | asm is assembled + linked by gcc |
 | C++ | `g++` | **Baked** (`g++`, `build-essential`) | apt/dnf/brew/choco | |
 | TypeScript / JavaScript / React | `node` | **Baked** (base image) | present (backend needs Node) | React = TSX transpile + SSR smoke test |
@@ -90,6 +93,24 @@ Every language used by the tracks, DSA and projects has a defined provisioning p
 | Ansible | `ansible-playbook` | **Baked** (`ansible`) | apt/dnf/brew, `pip install ansible` | Submitted code IS a playbook: syntax-check, then a real run against localhost (`-c local`); no `become`, no remote hosts |
 | Terraform | `terraform` | **Baked** (official 1.17.2 zip) | **Auto** (official zip, Linux) | `terraform init -backend=false` then `terraform validate`; configs are provider-less (variables/locals/outputs) so init works offline |
 | Docker | `docker` | **CLI baked** (official static binary) | **Manual only** (needs the Engine daemon) | The image ships only the CLI — see "Docker exercises need the host daemon" below |
+
+### Batfish is manual-only
+
+Batfish is not baked into the image: it needs a Java server process (coordinator + worker), not just a Python library. Batfish lessons in CodeForge are validation-style — offline analysis of configs — and are never presented as live queries against a running Batfish server. To run a real Batfish server yourself:
+
+```bash
+# Option A — all-in-one container (needs Docker Engine running):
+docker run -d --name batfish -p 9996:9996 -p 9997:9997 batfish/batfish
+# Option B — all-in-one jar (needs Java 11+):
+#   download batfish-all-in-one.jar from https://github.com/batfish/batfish/releases
+java -jar batfish-all-in-one.jar
+# Python client for either option:
+pip install pybatfish
+```
+
+### Network automation: device-touching work needs a real lab
+
+Exercises that touch real devices — SSH/NETCONF/RESTCONF to routers and switches, pushing configuration, running pyATS/Genie against live gear — need a lab or real devices (e.g. Containerlab or EVE-NG) and are labelled lab-needed in the lesson. They are never faked as passing without a device. What runs for real locally, with no device: Jinja2 templating, TextFSM/ntc-templates parsing, YAML inventory handling, Nornir/NAPALM/pyATS against local files and mocks, NETCONF/RESTCONF client code against a local mock, and all validation-style checks.
 
 ### Docker exercises need the host daemon
 
